@@ -335,6 +335,8 @@ class LMStudioClient:
         total_prompt = 0
         total_completion = 0
         total_reasoning = 0
+        total_reasoning_chars = 0
+        total_reasoning_present = False
         total_tokens = 0
         http_retries = 0
         retry_diagnostics: list[str] = []
@@ -379,6 +381,14 @@ class LMStudioClient:
             }
             if effective_reasoning and effective_reasoning != "provider_default":
                 payload["reasoning_effort"] = effective_reasoning
+            # llama.cpp/Qwen-family chat templates expose per-request thinking via
+            # chat_template_kwargs. Other OpenAI-compatible servers may reject the
+            # extension; bounded transport fallback below removes only unsupported
+            # optional controls without changing the semantic request.
+            if self.thinking_mode == "off":
+                payload["chat_template_kwargs"] = {"enable_thinking": False}
+            elif self.thinking_mode == "on":
+                payload["chat_template_kwargs"] = {"enable_thinking": True}
 
             start = time.perf_counter()
             attempt_http_retries = 0
@@ -394,6 +404,13 @@ class LMStudioClient:
                             http_retries += 1
                             attempt_http_retries += 1
                             payload.pop("reasoning_effort", None)
+                            response = requests.post(endpoint, headers=self.headers, json=payload, timeout=self.timeout_seconds)
+                    if response.status_code >= 400 and "chat_template_kwargs" in payload:
+                        body = response.text.lower()
+                        if "chat_template" in body or "enable_thinking" in body or response.status_code in (400, 422):
+                            http_retries += 1
+                            attempt_http_retries += 1
+                            payload.pop("chat_template_kwargs", None)
                             response = requests.post(endpoint, headers=self.headers, json=payload, timeout=self.timeout_seconds)
                     response.raise_for_status()
                     data = response.json()
@@ -414,7 +431,7 @@ class LMStudioClient:
                 stats = ApiStats(
                     elapsed_seconds=total_elapsed, prompt_tokens=total_prompt, completion_tokens=total_completion,
                     total_tokens=total_tokens, reasoning_tokens=total_reasoning,
-                    retries=http_retries + structured_attempt, endpoint=endpoint, model=self.model,
+                    thinking_requested=self.thinking_mode, retries=http_retries + structured_attempt, endpoint=endpoint, model=self.model,
                 )
                 raise LMStudioError(
                     f"LM Studio request failed: {exc}", stats=stats, transport="openai-chat",
@@ -434,7 +451,7 @@ class LMStudioClient:
                 stats = ApiStats(
                     elapsed_seconds=total_elapsed, prompt_tokens=total_prompt, completion_tokens=total_completion,
                     total_tokens=total_tokens, reasoning_tokens=total_reasoning,
-                    retries=http_retries + structured_attempt, endpoint=endpoint, model=self.model,
+                    thinking_requested=self.thinking_mode, retries=http_retries + structured_attempt, endpoint=endpoint, model=self.model,
                 )
                 raise LMStudioError(
                     f"LM Studio response could not be decoded: {exc}", stats=stats, transport="openai-chat",
@@ -457,7 +474,7 @@ class LMStudioClient:
             attempt_stats = ApiStats(
                 elapsed_seconds=elapsed, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
                 total_tokens=used_total_tokens, reasoning_tokens=reasoning_tokens, retries=attempt_http_retries,
-                endpoint=endpoint, model=self.model,
+                endpoint=endpoint, model=self.model, thinking_requested=self.thinking_mode,
             )
 
             try:
@@ -465,7 +482,17 @@ class LMStudioClient:
                 message = choice["message"]
                 last_finish_reason = str(choice.get("finish_reason", "") or "")
                 raw = message.get("content", "")
-                last_reasoning = message.get("reasoning_content", "") or ""
+                last_reasoning = message.get("reasoning_content", "") or message.get("reasoning", "") or ""
+                reasoning_chars = len(str(last_reasoning or ""))
+                attempt_stats.reasoning_content_present = reasoning_chars > 0
+                attempt_stats.reasoning_content_chars = reasoning_chars
+                total_reasoning_chars += reasoning_chars
+                total_reasoning_present = total_reasoning_present or reasoning_chars > 0
+                if reasoning_chars > 0 and self.thinking_mode == "off":
+                    retry_diagnostics.append(
+                        "Provider returned reasoning_content despite thinking_mode=off; "
+                        "request-level enable_thinking=false was sent when supported."
+                    )
                 if isinstance(raw, list):
                     raw = "".join(str(x.get("text", "")) if isinstance(x, dict) else str(x) for x in raw)
                 last_raw = str(raw or "")
@@ -496,7 +523,9 @@ class LMStudioClient:
                     continue
                 stats = ApiStats(
                     elapsed_seconds=total_elapsed, prompt_tokens=total_prompt, completion_tokens=total_completion,
-                    total_tokens=total_tokens, reasoning_tokens=total_reasoning, retries=http_retries + 1,
+                    total_tokens=total_tokens, reasoning_tokens=total_reasoning,
+                    reasoning_content_present=total_reasoning_present, reasoning_content_chars=total_reasoning_chars,
+                    thinking_requested=self.thinking_mode, retries=http_retries + 1,
                     endpoint=endpoint, model=self.model,
                 )
                 preview = last_api_response[:3500]
@@ -514,7 +543,9 @@ class LMStudioClient:
             ))
             stats = ApiStats(
                 elapsed_seconds=total_elapsed, prompt_tokens=total_prompt, completion_tokens=total_completion,
-                total_tokens=total_tokens, reasoning_tokens=total_reasoning, retries=http_retries + structured_attempt,
+                total_tokens=total_tokens, reasoning_tokens=total_reasoning,
+                reasoning_content_present=total_reasoning_present, reasoning_content_chars=total_reasoning_chars,
+                thinking_requested=self.thinking_mode, retries=http_retries + structured_attempt,
                 endpoint=endpoint, model=self.model,
             )
             return StructuredResponse(

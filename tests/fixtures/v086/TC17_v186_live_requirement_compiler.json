@@ -1,0 +1,192 @@
+{
+  "requirement_irs": [
+    {
+      "requirement_id": "REQ-1701",
+      "faithful_meaning": "When IgnitionState is ON, GearPosition is P or N, and ServiceMode is not ACTIVE, StarterEnable must be TRUE.",
+      "normative_type": "MANDATORY",
+      "condition": {
+        "kind": "AND",
+        "semantic_id": "REQ-1701.cond",
+        "source_phrase": "Wenn IgnitionState = ON und (GearPosition = P oder GearPosition = N) and ServiceMode is not ACTIVE",
+        "children": [
+          {
+            "kind": "PREDICATE",
+            "semantic_id": "REQ-1701.cond.ignition",
+            "source_phrase": "IgnitionState = ON",
+            "signal": "IgnitionState",
+            "operator": "EQ",
+            "value": "ON"
+          },
+          {
+            "kind": "OR",
+            "semantic_id": "REQ-1701.cond.gear",
+            "source_phrase": "(GearPosition = P oder GearPosition = N)",
+            "children": [
+              {
+                "kind": "PREDICATE",
+                "semantic_id": "REQ-1701.cond.gear.p",
+                "source_phrase": "GearPosition = P",
+                "signal": "GearPosition",
+                "operator": "EQ",
+                "value": "P"
+              },
+              {
+                "kind": "PREDICATE",
+                "semantic_id": "REQ-1701.cond.gear.n",
+                "source_phrase": "GearPosition = N",
+                "signal": "GearPosition",
+                "operator": "EQ",
+                "value": "N"
+              }
+            ]
+          },
+          {
+            "kind": "NOT",
+            "semantic_id": "REQ-1701.cond.service",
+            "source_phrase": "ServiceMode is not ACTIVE",
+            "children": [
+              {
+                "kind": "PREDICATE",
+                "semantic_id": "REQ-1701.cond.service.active",
+                "source_phrase": "ServiceMode is ACTIVE",
+                "signal": "ServiceMode",
+                "operator": "EQ",
+                "value": "ACTIVE"
+              }
+            ]
+          }
+        ]
+      },
+      "trigger": null,
+      "required_behavior": {
+        "semantic_id": "REQ-1701.behavior",
+        "source_phrase": "StarterEnable shall be TRUE"
+      },
+      "timing": null,
+      "persistence": null,
+      "relationships": [],
+      "source_clauses": [
+        {
+          "semantic_id": "REQ-1701.cond",
+          "role": "CONDITION",
+          "source_phrase": "Wenn IgnitionState = ON und (GearPosition = P oder GearPosition = N) and ServiceMode is not ACTIVE"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.ignition",
+          "role": "CONDITION",
+          "source_phrase": "IgnitionState = ON"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.gear",
+          "role": "CONDITION",
+          "source_phrase": "(GearPosition = P oder GearPosition = N)"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.gear.p",
+          "role": "CONDITION",
+          "source_phrase": "GearPosition = P"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.gear.n",
+          "role": "CONDITION",
+          "source_phrase": "GearPosition = N"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.service",
+          "role": "CONDITION",
+          "source_phrase": "ServiceMode is not ACTIVE"
+        },
+        {
+          "semantic_id": "REQ-1701.cond.service.active",
+          "role": "CONDITION",
+          "source_phrase": "ServiceMode is ACTIVE"
+        },
+        {
+          "semantic_id": "REQ-1701.behavior",
+          "role": "REQUIRED_BEHAVIOR",
+          "source_phrase": "StarterEnable shall be TRUE"
+        }
+      ],
+      "unresolved_semantics": [],
+      "unmapped_source_spans": []
+    },
+    {
+      "requirement_id": "REQ-1702",
+      "faithful_meaning": "When BatteryVoltage is below 9.5 V, StarterEnable must be FALSE.",
+      "normative_type": "MANDATORY",
+      "condition": {
+        "kind": "PREDICATE",
+        "semantic_id": "REQ-1702.cond",
+        "source_phrase": "BatteryVoltage is below 9.5 V",
+        "signal": "BatteryVoltage",
+        "operator": "LT",
+        "value": "{\"value\":9.5,\"unit\":\"V\"}"
+      },
+      "trigger": null,
+      "required_behavior": {
+        "semantic_id": "REQ-1702.behavior",
+        "source_phrase": "StarterEnable shall be FALSE"
+      },
+      "timing": null,
+      "persistence": null,
+      "relationships": [],
+      "source_clauses": [
+        {
+          "semantic_id": "REQ-1702.cond",
+          "role": "CONDITION",
+          "source_phrase": "BatteryVoltage is below 9.5 V"
+        },
+        {
+          "semantic_id": "REQ-1702.behavior",
+          "role": "REQUIRED_BEHAVIOR",
+          "source_phrase": "StarterEnable shall be FALSE"
+        }
+      ],
+      "unresolved_semantics": [],
+      "unmapped_source_spans": []
+    },
+    {
+      "requirement_id": "REQ-1703",
+      "faithful_meaning": "When ServiceMode is ACTIVE, StarterEnable must remain FALSE.",
+      "normative_type": "MANDATORY",
+      "condition": {
+        "kind": "PREDICATE",
+        "semantic_id": "REQ-1703.cond",
+        "source_phrase": "ServiceMode = ACTIVE",
+        "signal": "ServiceMode",
+        "operator": "EQ",
+        "value": "ACTIVE"
+      },
+      "trigger": null,
+      "required_behavior": {
+        "semantic_id": "REQ-1703.behavior",
+        "source_phrase": "StarterEnable shall remain FALSE"
+      },
+      "timing": null,
+      "persistence": {
+        "semantic_id": "REQ-1703.persistence",
+        "source_phrase": "StarterEnable shall remain FALSE"
+      },
+      "relationships": [],
+      "source_clauses": [
+        {
+          "semantic_id": "REQ-1703.cond",
+          "role": "CONDITION",
+          "source_phrase": "ServiceMode = ACTIVE"
+        },
+        {
+          "semantic_id": "REQ-1703.behavior",
+          "role": "REQUIRED_BEHAVIOR",
+          "source_phrase": "StarterEnable shall remain FALSE"
+        },
+        {
+          "semantic_id": "REQ-1703.persistence",
+          "role": "PERSISTENCE",
+          "source_phrase": "StarterEnable shall remain FALSE"
+        }
+      ],
+      "unresolved_semantics": [],
+      "unmapped_source_spans": []
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.6:** RCA Core v0.8.5 candidate.
+**Current RCA architecture carried by application v1.8.7:** RCA Core v0.8.6 candidate.
 
 ## 1. Persistent invariants
 
@@ -66,7 +66,29 @@ Notes do not substitute for executable fields.
 
 Evidence prompts enumerate legal schema values. Python does not translate invented words (`HAS`, `REACHES`, `WAS`, `CONTAINS`) into semantics.
 
-## 9. Current topology
+## 9. A7 — v0.8.6 live-TC17 transport/completion hardening
+
+The first v1.8.6 live TC17 run with Qwen3.8-27B for semantic preparation/verification and a 32K server context proved the model could reconstruct the central nested Boolean condition correctly, but exposed additional integration/contract defects:
+
+1. Thinking Off did not reach llama.cpp and large `reasoning_content` consumed output budget while telemetry still reported zero reasoning tokens.
+2. Requirement behavior shells could carry provenance but omit executable signal/operator/value.
+3. Structural completion regenerated full IR and hit the 12K output limit twice instead of repairing only broken fields.
+4. Persistent language evidence could be correctly understood yet remain non-executable because scope resolution was missing.
+5. Narrative/title/reporting ambiguity was made material too broadly.
+6. Arbitration could understand the correct repair but separate source-clause IDs from anonymous executable nodes, causing strict validation rejection.
+
+v0.8.6 adds:
+
+- request-level llama.cpp/Qwen thinking propagation and reasoning-content observability;
+- targeted `RequirementStructuralPatchBatch` completion protected against untargeted overwrite;
+- stronger required-behavior/negative-predicate/persistence executability contracts;
+- structural detection/completion of unresolved persistent scope;
+- materiality based on explicit roles and actual Requirement-IR structured dependencies;
+- stricter arbitration prompt provenance while retaining the existing Python validator.
+
+No Python NLP heuristics or evidence-rule weakening are introduced.
+
+## 10. Current topology
 
 ```text
 RAW CASE
@@ -87,8 +109,8 @@ RAW CASE
 → deterministic report
 ```
 
-## 10. Validation status
+## 11. Validation status
 
-RCA Core v0.8.5 is a **candidate**, not frozen. Live TC17 and TC12 must pass current expected targets before promotion.
+RCA Core v0.8.6 is a **candidate**, not frozen. Live TC17 and TC12 must pass current expected targets before promotion.
 
 Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3.

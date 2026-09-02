@@ -131,3 +131,8 @@ The v1.8.4 matrix remains the historical desktop-to-Web migration baseline. v1.8
 | Critical semantic model | hard to test stronger model without endpoint workaround | preparation and verification independently route Small / Utility or Primary |
 
 These changes remain presentation/configuration/routing boundaries. The frontend still contains zero RCA decision logic.
+
+
+## v1.8.7 semantic transport addendum
+
+v1.8.7 does not change desktop/Web feature ownership. It closes a provider-integration observability gap exposed by live RunPod TC17: explicit Thinking Off/On is propagated to supported Qwen/llama.cpp requests and reasoning-content activity is visible even when provider reasoning-token accounting is zero. Critical semantic role routing remains a backend configuration decision; the browser still contains zero RCA logic.

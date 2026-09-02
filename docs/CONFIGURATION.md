@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.6 Configuration Reference
+# RCA Analyst v1.8.7 Configuration Reference
 
 ## Top-level application configuration
 
@@ -24,9 +24,9 @@ Each role contains:
 - `transport`
 - `api_token_env`
 
-`context_size` is expected/provider metadata in v1.8.6; it does not reconfigure an already-running external model server.
+`context_size` is expected/provider metadata in v1.8.7; it does not reconfigure an already-running external model server.
 
-### `model_routing` — new in v1.8.6
+### `model_routing` — new in v1.8.7
 
 ```json
 {
@@ -45,6 +45,12 @@ Allowed roles are `small` and `primary`.
 - semantic verification role owns the independent original-requirement vs candidate-IR verifier, including post-arbitration verification;
 - changing these fields changes model capacity/transport only. Python retains deterministic compliance authority.
 
+### Qwen/llama.cpp thinking control — v1.8.7
+
+For OpenAI-compatible chat transport, an explicit role `thinking_mode=off` is sent as `chat_template_kwargs.enable_thinking=false`; `on` sends `true`; `provider_default` omits the option. If a compatible provider rejects the optional field with HTTP 400/422, one bounded transport fallback removes only that field.
+
+Telemetry records provider-reported reasoning tokens separately from `reasoning_content_present` / `reasoning_content_chars`, so a provider returning reasoning text despite Thinking Off is visible rather than reported as zero-reasoning activity.
+
 ### `inference`
 
 Fields remain preserved:
@@ -60,7 +66,7 @@ Fields remain preserved:
 - `context_size_override`
 - `provider_options`
 
-Important v1.8.6 behavior: the FastAPI backend does not currently own external LM Studio/llama.cpp/vLLM process lifecycle. Consequently these controls are capability-disabled unless a deployment adapter explicitly advertises backend ownership. They must not imply that editing the Web form changes `llama-server -c`, GPU layers, Flash Attention, etc.
+Important v1.8.7 behavior: the FastAPI backend does not currently own external LM Studio/llama.cpp/vLLM process lifecycle. Consequently these controls are capability-disabled unless a deployment adapter explicitly advertises backend ownership. They must not imply that editing the Web form changes `llama-server -c`, GPU layers, Flash Attention, etc.
 
 ## Environment overrides
 
@@ -79,7 +85,7 @@ Deployment variables include:
 - `RCA_SMALL_PROVIDER`
 - model API-token environment variables such as `LM_API_TOKEN`.
 
-The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.6 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
+The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.7 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
 
 A Web-started run additionally supplies the current form through `config_override`. That run snapshot is authoritative for that run and is persisted in `config_snapshot.json`/session metadata.
 
@@ -91,4 +97,4 @@ There are three distinct concepts:
 2. actual server runtime context, e.g. llama.cpp `-c 8192`;
 3. RCA configuration metadata/expectation.
 
-Only (2) controls the running server's real context window. v1.8.6 model discovery displays provider-advertised runtime context when available so mismatches are visible.
+Only (2) controls the running server's real context window. v1.8.7 model discovery displays provider-advertised runtime context when available so mismatches are visible.

@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.6 API
+# RCA Analyst v1.8.7 API
 
 Base path: `/api/v1`.
 
@@ -59,7 +59,7 @@ The response contains `models` and the provider `catalog` where available. llama
 }
 ```
 
-`config_override` is optional. v1.8.6 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
+`config_override` is optional. v1.8.7 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
 
 Run types:
 

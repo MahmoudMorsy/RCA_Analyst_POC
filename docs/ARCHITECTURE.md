@@ -1,15 +1,15 @@
-# RCA Analyst v1.8.6 Application Architecture
+# RCA Analyst v1.8.7 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.6  
-**Embedded RCA Core:** v0.8.5 candidate
+**Application version:** v1.8.7  
+**Embedded RCA Core:** v0.8.6 candidate
 
-v1.8.6 keeps the v1.8.x Web/FastAPI modular-monolith architecture while repairing observability, batch-result parity, model discovery/configuration behavior and benchmarking. It also carries RCA Core v0.8.5, an evidence-driven semantic hardening release based on live Dell/RunPod TC12/TC17 failures.
+v1.8.7 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.6 observability/configuration repairs. It carries RCA Core v0.8.6, a live-TC17-driven semantic transport/completion hardening release: request-level Qwen thinking control, reasoning-content telemetry, targeted IR completion, executable persistence-scope routing, corrected materiality and stricter arbitration provenance.
 
-RCA Core v0.8.5 is **not frozen** until live TC17/TC12 reruns pass. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.6 is **not frozen** until live TC17/TC12 reruns pass. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.5.md`](RCA_CORE_ARCHITECTURE_v0.8.5.md). Historical v0.8.4 architecture remains packaged separately.
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.6.md`](RCA_CORE_ARCHITECTURE_v0.8.6.md). Historical v0.8.4 architecture remains packaged separately.
 
 ## 2. Current topology
 
@@ -24,7 +24,7 @@ Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.5.md`](RCA_C
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager       RCA Core v0.8.5       Storage / Sessions
+ Async Run Manager       RCA Core v0.8.6       Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -99,7 +99,7 @@ Browser reload/disconnect does not cancel a run. Backend-process crash recovery 
 
 ## 6. Pipeline persistence and inspection
 
-v1.8.6 fixes the v1.8.5 stage-replacement bug. Repeated events for one stage are **merged**, so later completion/status events do not erase earlier Stage Input or Output.
+v1.8.7 fixes the v1.8.5 stage-replacement bug. Repeated events for one stage are **merged**, so later completion/status events do not erase earlier Stage Input or Output.
 
 Persisted stage data includes:
 
@@ -134,7 +134,7 @@ The Sequential Batch tab is an overall dashboard, not a substitute for per-case 
 
 The RCA core consumes the provider-neutral `ModelClient` protocol. `PipelineFactory` constructs clients through `ModelGateway`.
 
-v1.8.6 adds **Critical Semantic Model Routing**:
+v1.8.7 adds **Critical Semantic Model Routing**:
 
 - semantic preparation (Requirement IR compilation + evidence annotation) can use `small` or `primary`;
 - independent semantic verification can separately use `small` or `primary`.
@@ -142,6 +142,10 @@ v1.8.6 adds **Critical Semantic Model Routing**:
 This is a capacity/transport selection only. Python remains authoritative for deterministic compliance.
 
 Utility tasks may remain on the configured Small / Utility model while a stronger model is assigned to critical semantic roles.
+
+### v1.8.7 semantic-call execution
+
+OpenAI-compatible Qwen/llama.cpp requests propagate explicit thinking state through chat-template kwargs. Reasoning text is observed independently from provider token accounting. Requirement structural completion is a targeted patch call: Python supplies exact broken fields, the model returns only those fields, and Python rejects any untargeted overwrite. This keeps a correct condition AST from being regenerated because another field is incomplete.
 
 ## 9. Configuration model
 
@@ -177,7 +181,7 @@ Primary and Small / Utility roles independently define:
 
 CPU threads, GPU layers/offload, tensor split, Flash Attention, batch sizes, slots, context override and provider options remain capability-gated metadata unless a deployment adapter explicitly owns the external model-server process.
 
-**Important:** v1.8.6 does not restart/reconfigure an externally launched llama.cpp/LM Studio/vLLM process. A server launched with `llama-server -c 8192` remains 8K regardless of a Web form value.
+**Important:** v1.8.7 does not restart/reconfigure an externally launched llama.cpp/LM Studio/vLLM process. A server launched with `llama-server -c 8192` remains 8K regardless of a Web form value.
 
 ## 10. Model discovery and environment overrides
 

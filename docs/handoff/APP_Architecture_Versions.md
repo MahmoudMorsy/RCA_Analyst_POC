@@ -1,7 +1,7 @@
 # APP Architecture Versions
 
-**Current application version:** v1.8.6  
-**Embedded RCA Core:** v0.8.5 candidate
+**Current application version:** v1.8.7  
+**Embedded RCA Core:** v0.8.6 candidate
 
 ## 1. Principles
 
@@ -94,4 +94,21 @@ Dell, RunPod and Home remain one codebase. RunPod model ports should remain priv
 
 ## 10. Current validation status
 
-Automated application tests are release gates, but Web parity/RunPod readiness still require live-model/browser validation. TC17/TC12 are the next semantic acceptance targets after v1.8.6 packaging.
+Automated application tests are release gates, but Web parity/RunPod readiness still require live-model/browser validation. TC17 then TC12 are the next semantic acceptance targets after v1.8.7 packaging; RCA Core v0.8.6 remains candidate until both pass.
+
+## 8. B6 — v1.8.7 semantic transport/observability hardening
+
+The Web/backend topology remains unchanged from v1.8.6. v1.8.7 repairs the boundary between configured semantic-role settings and actual OpenAI-compatible model requests:
+
+- explicit Thinking Off/On is propagated to Qwen/llama.cpp through request-level chat-template kwargs;
+- reasoning-content presence and size are recorded even when provider token accounting reports zero reasoning tokens;
+- critical semantic routing remains configurable without endpoint hacks/process killing;
+- per-stage/per-role statistics expose requested thinking mode and reasoning-content activity;
+- the core uses targeted structural semantic patches so the application no longer spends full semantic budgets regenerating already-valid IR.
+
+External llama.cpp/LM Studio/vLLM context/offload/process lifecycle remains server-owned. v1.8.7 does not pretend a browser field can change a running server's `-c` value.
+
+## 9. Current API / deployment status
+
+The stable `/api/v1` contracts from v1.8.6 remain. No browser RCA decision logic is added. Dell, RunPod and Home remain one codebase with configuration-only hardware differences.
+

@@ -1,0 +1,197 @@
+{
+  "evidence_annotations": [
+    {
+      "evidence_id": "EVID-TITLE",
+      "resolution": "PARTIALLY_RESOLVED",
+      "facts": [
+        {
+          "fact_id": "EVID-TITLE-F1",
+          "source_phrase": "Mixed German-English starter condition with nested logic and a voltage threshold.",
+          "subject": "starter condition",
+          "operator": "OTHER",
+          "value": "mixed German-English with nested logic and a voltage threshold",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "OTHER",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "PARTIALLY_RESOLVED",
+          "possible_roles": [],
+          "related_requirement_ids": [],
+          "notes": "Descriptive ticket title; no concrete signal, value, or interval is asserted."
+        }
+      ],
+      "unresolved_semantics": [
+        "The title is a descriptive summary and does not identify a concrete signal, value, or interval."
+      ]
+    },
+    {
+      "evidence_id": "EVID-DESCRIPTION",
+      "resolution": "PARTIALLY_RESOLVED",
+      "facts": [
+        {
+          "fact_id": "EVID-DESCRIPTION-F1",
+          "source_phrase": "StarterEnable is FALSE",
+          "subject": "StarterEnable",
+          "operator": "EQ",
+          "value": "FALSE",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "POINT_STATE",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "VERIFIED",
+          "possible_roles": [],
+          "related_requirement_ids": [],
+          "notes": "The description explicitly states the observed value of StarterEnable."
+        },
+        {
+          "fact_id": "EVID-DESCRIPTION-F2",
+          "source_phrase": "the observed operating point appears to satisfy the nested enable condition",
+          "subject": "observed operating point",
+          "operator": "OTHER",
+          "value": "appears to satisfy the nested enable condition",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "POINT_STATE",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "UNRESOLVED",
+          "possible_roles": [],
+          "related_requirement_ids": [
+            "REQ-1701"
+          ],
+          "notes": "The phrase is hedged with 'appears to satisfy' and does not assert verified satisfaction."
+        },
+        {
+          "fact_id": "EVID-DESCRIPTION-F3",
+          "source_phrase": "Additional requirements cover low-voltage and service-mode behavior.",
+          "subject": "additional requirements",
+          "operator": "OTHER",
+          "value": "cover low-voltage and service-mode behavior",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "OTHER",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "VERIFIED",
+          "possible_roles": [],
+          "related_requirement_ids": [
+            "REQ-1702",
+            "REQ-1703"
+          ],
+          "notes": "The description explicitly references additional low-voltage and service-mode requirements."
+        }
+      ],
+      "unresolved_semantics": [
+        "The phrase 'appears to satisfy' is not a verified satisfaction statement.",
+        "The 'observed operating point' is not tied to a concrete interval or timestamp."
+      ]
+    },
+    {
+      "evidence_id": "EVID-REPORTED-001",
+      "resolution": "PARTIALLY_RESOLVED",
+      "facts": [
+        {
+          "fact_id": "EVID-REPORTED-001-F1",
+          "source_phrase": "StarterEnable remained FALSE at the verification point.",
+          "subject": "StarterEnable",
+          "operator": "EQ",
+          "value": "FALSE",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "POINT_STATE",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "VERIFIED",
+          "possible_roles": [],
+          "related_requirement_ids": [],
+          "notes": "The reported result explicitly states the value of StarterEnable at a verification point."
+        }
+      ],
+      "unresolved_semantics": [
+        "The 'verification point' is not identified as a concrete interval or timestamp."
+      ]
+    },
+    {
+      "evidence_id": "EVID-DIRECT-001",
+      "resolution": "VERIFIED",
+      "facts": [
+        {
+          "fact_id": "EVID-DIRECT-001-F1",
+          "source_phrase": "BatteryVoltage remained 12.2 throughout the complete evaluated interval.",
+          "subject": "BatteryVoltage",
+          "operator": "EQ",
+          "value": "12.2",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "PERSISTENT_STATE",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "VERIFIED",
+          "possible_roles": [],
+          "related_requirement_ids": [
+            "REQ-1702"
+          ],
+          "notes": "The direct observation explicitly states a persistent voltage value over the complete evaluated interval."
+        }
+      ],
+      "unresolved_semantics": []
+    },
+    {
+      "evidence_id": "EVID-DIRECT-002",
+      "resolution": "VERIFIED",
+      "facts": [
+        {
+          "fact_id": "EVID-DIRECT-002-F1",
+          "source_phrase": "ServiceMode remained INACTIVE throughout the complete evaluated interval.",
+          "subject": "ServiceMode",
+          "operator": "EQ",
+          "value": "INACTIVE",
+          "numeric_value": null,
+          "numeric_unit": "",
+          "temporal_semantics": "PERSISTENT_STATE",
+          "scope": {
+            "source_phrase": "",
+            "resolution": "NOT_APPLICABLE",
+            "scope_id": "",
+            "notes": ""
+          },
+          "resolution": "VERIFIED",
+          "possible_roles": [],
+          "related_requirement_ids": [
+            "REQ-1701",
+            "REQ-1703"
+          ],
+          "notes": "The direct observation explicitly states a persistent ServiceMode value over the complete evaluated interval."
+        }
+      ],
+      "unresolved_semantics": []
+    }
+  ],
+  "unresolved_case_semantics": []
+}

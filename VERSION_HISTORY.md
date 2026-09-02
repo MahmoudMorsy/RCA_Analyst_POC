@@ -2,10 +2,22 @@
 
 ## Current version model
 
-- **Application version:** v1.8.6 — Web/FastAPI/backend/deployment/observability repair release.
-- **Embedded RCA Core:** v0.8.5 candidate — semantic-verification/arbitration hardening carried inside v1.8.6.
-- **Validation:** automated release gates must pass; RCA Core v0.8.5 remains unfrozen until live TC17/TC12 reruns meet their expected semantic targets.
+- **Application version:** v1.8.7 — semantic transport/completion hardening release on the v1.8.6 Web/FastAPI baseline.
+- **Embedded RCA Core:** v0.8.6 candidate — live-TC17 semantic transport/completion, scope/materiality and provenance hardening.
+- **Validation:** automated release gates must pass; RCA Core v0.8.6 remains unfrozen until live TC17 then TC12 reruns meet their expected semantic targets.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+
+## v1.8.6 → v1.8.7
+
+- Live RunPod TC17 proved the 27B could reconstruct the nested Boolean requirement correctly, but exposed ineffective Thinking Off propagation, hidden reasoning-content cost, incomplete behavior shells, full-IR structural-repair token explosions, unresolved persistence scope, over-broad narrative materiality and arbitration provenance gaps.
+- Added request-level llama.cpp/Qwen `enable_thinking` propagation with bounded compatibility fallback and explicit reasoning-content observability.
+- Replaced full Requirement IR structural completion with targeted field patches guarded by Python against untargeted overwrite.
+- Strengthened compiler/verifier executability contracts for required behavior, simple negative predicates, literal comparison values and explicit persistence.
+- Made unresolved persistent scope a structural evidence defect and added explicit whole evaluated-interval scope semantics only when grounded by the source.
+- Corrected materiality so requirement association alone does not turn narrative ambiguity into a compliance blocker; structured Requirement-IR dependencies remain conservative.
+- Kept strict arbitration validation and tightened the model contract so provenance must be attached to the executable repaired node.
+- Added live-TC17-derived v0.8.6 regressions.
+- Release validation: **207 passed** in the working tree and **207 passed** from a clean fresh extraction.
 
 ## v1.8.5 → v1.8.6
 
@@ -124,7 +136,7 @@ This file is the chronological release-history log for the RCA Analyst POC. It c
 For v0.1, which predates the formal changelog, the entry is reconstructed from the repository README section **Why v0.2 exists**. All later entries come from the maintained changelog/release notes.
 
 **Earliest known release:** v0.1
-**Current release:** v1.8.6
+**Current release:** v1.8.7
 
 ## v0.1 — Earliest known baseline
 

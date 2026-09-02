@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.6  
-**Current RCA semantic-core baseline:** v0.8.5 candidate  
-**Validation status:** automated release gates are required and live TC17/TC12 validation remains pending. RCA Core v0.8.5 must not be declared frozen until those live reruns meet expected semantic targets.
+**Current application release:** v1.8.7  
+**Current RCA semantic-core baseline:** v0.8.6 candidate  
+**Validation status:** automated release gates are required and live TC17/TC12 validation remains pending. RCA Core v0.8.6 must not be declared frozen until those live reruns meet expected semantic targets.
 
 ## 1. Product vision
 
@@ -89,7 +89,7 @@ Preserve all established rules, including:
 - raw source is never discarded;
 - transport-valid IR is not automatically executable IR.
 
-## 7. Current RCA Core v0.8.5 pipeline
+## 7. Current RCA Core v0.8.6 pipeline
 
 ```text
 RAW CASE
@@ -128,28 +128,32 @@ v0.8.5 therefore:
 - rejects notes-only/non-executable arbitration evidence replacements;
 - tightens evidence prompt enums without Python phrase/operator mappings.
 
-## 9. Current application architecture v1.8.6
+### v0.8.6 live-TC17 hardening
+
+The v1.8.6 live TC17 run showed that stronger 27B semantics alone were insufficient: Thinking Off was not reaching llama.cpp, reasoning text was invisible in token telemetry, structural completion regenerated too much IR, persistent evidence scope remained non-executable, narrative ambiguity was over-materialized, and arbitration provenance was separated from executable nodes. v0.8.6 therefore adds request-level thinking control, targeted structural patches, reasoning-content observability, explicit persistent-scope completion, structured-dependency materiality and stricter executable-node provenance. Python evidence/compliance rules remain unchanged.
+
+## 9. Current application architecture v1.8.7
 
 ```text
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.5
+→ RCA Core v0.8.6
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.6 repairs:
+v1.8.7 retains the v1.8.6 Web repairs and adds:
 
-- Stage Input persistence;
-- human-readable structured stage I/O;
-- per-testcase batch result parity and incremental publication;
-- per-case/per-stage stats including failed calls;
-- current-endpoint model discovery/test;
-- environment override visibility and run-specific config snapshots;
-- external model-server context/control UX;
-- active version references.
+- request-level Qwen/llama.cpp Thinking Off/On propagation for critical semantic roles;
+- reasoning-content presence/character telemetry independent of provider reasoning-token accounting;
+- targeted Requirement IR structural patches instead of full-IR regeneration;
+- bounded targeted semantic-completion budgets;
+- persistent evidence scope completion and structured-dependency materiality;
+- arbitration provenance attached directly to executable repaired nodes.
+
+The v1.8.6 Stage Input persistence, readable structured I/O, batch testcase parity, incremental results, statistics, current-endpoint discovery/test, environment-override visibility, per-run snapshots and external-server authority UX remain required.
 
 ## 10. Configuration requirements
 

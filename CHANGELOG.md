@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.8.7
+
+- Promote application to **v1.8.7** with embedded **RCA Core v0.8.6 candidate**; v0.8.6 remains unfrozen pending live TC17 then TC12 acceptance.
+- Propagate explicit Qwen/llama.cpp thinking mode through `chat_template_kwargs.enable_thinking` for OpenAI-compatible requests, with one bounded compatibility fallback when a provider rejects that optional field.
+- Add reasoning-content observability (`reasoning_content_present`, character counts and requested thinking mode) without fabricating reasoning-token counts.
+- Replace full Requirement IR structural regeneration with targeted `RequirementStructuralPatchBatch` repair; Python permits only explicitly requested fields to change.
+- Bound targeted Requirement/evidence completion outputs so a small structural defect cannot consume the full semantic-preparation budget repeatedly.
+- Tighten Requirement IR executability for signal/value required behavior, grounded negative predicates, literal comparison values and explicit persistence.
+- Route all non-executable `PERSISTENT_STATE` scope shapes to semantic completion; whole evaluated-interval persistence is executable only with explicit resolved `CASE_EVALUATED_INTERVAL` grounding.
+- Correct unresolved-evidence materiality so narrative/title/reporting ambiguity is not blocking merely because it references a requirement, while structured facts used by Requirement IR remain material when semantics/scope are unresolved.
+- Tighten arbitration provenance: executable repaired nodes must themselves carry matching semantic IDs and grounded source phrases; notes or separately named clauses cannot substitute.
+- Preserve v0.8.5 independent semantic fingerprint verification, strict Python compliance authority, frozen evidence semantics and v1.8.6 Web/configuration improvements.
+- Add regressions derived from the live v1.8.6 TC17 compiler/evidence outputs and provider reasoning behavior.
+- Release validation: **207 passed** in the working tree and **207 passed** from a clean fresh extraction.
+
 ## 1.8.6
 
 - Promote application to **v1.8.6** with embedded **RCA Core v0.8.5 candidate**; v0.8.5 remains unfrozen pending live TC17/TC12 acceptance.

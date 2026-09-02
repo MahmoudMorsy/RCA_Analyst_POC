@@ -70,7 +70,7 @@ function renderCapabilities(){
 function renderEnvironmentOverrides(){
   const overrides=state.capabilities?.environment_overrides||{},box=$('modelOverrideWarning');const rows=Object.entries(overrides);
   if(!rows.length){box.textContent='';box.hidden=true;box.classList.remove('show');return;}box.hidden=false;box.classList.add('show');
-  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.6 run-specific configuration overrides remain authoritative for the run you start.</span>`;
+  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.7 run-specific configuration overrides remain authoritative for the run you start.</span>`;
 }
 
 const configMap={
@@ -159,7 +159,7 @@ function renderCaseResultViews(c,payload,metrics,pipeline){
 function renderStats(metrics,caseStats,pipeline){
   const root=$('statsView'),wrap=document.createElement('div');if(caseStats){const h=document.createElement('h3');h.textContent=`Testcase statistics · ${state.selectedCaseId}`;wrap.append(h,buildStructuredNode(caseStats,'',0));}
   const stageRows=(pipeline||[]).map(st=>({stage:st.name,status:st.status,elapsed_seconds:(st.elapsed_ms??0)/1000,...(st.metadata?.statistics||{})}));if(stageRows.length){const h=document.createElement('h3');h.textContent='Stage statistics';wrap.append(h);const t=document.createElement('div');wrap.append(t);renderTable(t,['Stage','Status','Elapsed','Model time','Calls','Prompt','Completion','Reasoning','Tok/s'],stageRows,x=>[x.stage,x.status,fmtSec(x.elapsed_seconds),fmtSec(x.model_seconds),x.model_call_count??0,x.prompt_tokens??0,x.completion_tokens??0,x.reasoning_tokens??0,x.weighted_generation_tokens_per_second??'—']);}
-  const calls=(metrics?.model_calls||[]).filter(x=>!state.selectedCaseId||x.case_id===state.selectedCaseId);if(calls.length){const h=document.createElement('h3');h.textContent='Model calls';wrap.append(h);const t=document.createElement('div');wrap.append(t);renderTable(t,['#','Role','Stage','Model','Endpoint','Time','Prompt','Completion','Reasoning','Finish','Retries'],calls,x=>[x.call_index,x.model_role,x.stage,x.model, x.endpoint,fmtSec(x.request_duration_seconds),x.prompt_tokens,x.completion_tokens,x.reasoning_tokens,x.finish_reason,x.retries]);}
+  const calls=(metrics?.model_calls||[]).filter(x=>!state.selectedCaseId||x.case_id===state.selectedCaseId);if(calls.length){const h=document.createElement('h3');h.textContent='Model calls';wrap.append(h);const t=document.createElement('div');wrap.append(t);renderTable(t,['#','Role','Stage','Model','Endpoint','Time','Prompt','Completion','Reasoning tokens','Reasoning chars','Thinking','Finish','Retries'],calls,x=>[x.call_index,x.model_role,x.stage,x.model,x.endpoint,fmtSec(x.request_duration_seconds),x.prompt_tokens,x.completion_tokens,x.reasoning_tokens,x.reasoning_content_chars??0,x.thinking_requested??'provider_default',x.finish_reason,x.retries]);}
   const raw=document.createElement('details');raw.className='raw-json';raw.innerHTML='<summary>Raw run metrics</summary>';const pre=document.createElement('pre');pre.textContent=pretty(metrics);raw.append(pre);wrap.append(raw);root.replaceChildren(wrap);
 }
 function renderPipeline(stages){

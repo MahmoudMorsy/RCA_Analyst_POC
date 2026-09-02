@@ -1,4 +1,4 @@
-# RunPod Deployment Guide — v1.8.6
+# RunPod Deployment Guide — v1.8.7
 
 ## Persistent layout
 
@@ -29,7 +29,7 @@ Model IDs may be provided by environment defaults or current Web form/run config
 
 ## Model-server launch parameters
 
-v1.8.6 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
+v1.8.7 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
 
 Example llama.cpp pattern:
 
@@ -53,7 +53,7 @@ For llama.cpp, inspect returned `n_ctx`.
 
 ## Critical Semantic Model Routing
 
-v1.8.6 can route critical semantic work without killing servers or patching code:
+v1.8.7 can route critical semantic work without killing servers or patching code:
 
 - Semantic Preparation → Small / Utility or Primary
 - Semantic Verification → Small / Utility or Primary
@@ -111,3 +111,9 @@ After deployment:
 5. run TC12 only after context/output budgets are confirmed;
 6. compare semantic acceptance separately from execution status;
 7. export the full run bundle for any failure.
+
+## Qwen thinking verification — v1.8.7
+
+When a critical role uses Thinking Off, v1.8.7 sends `chat_template_kwargs.enable_thinking=false` on OpenAI-compatible chat requests. Use the run model-call statistics to confirm `thinking_requested=off` and inspect `reasoning_content_present` / `reasoning_content_chars`. A zero provider reasoning-token count alone no longer proves that no reasoning text was generated.
+
+For the next live acceptance run, route semantic preparation and independent verification to the Primary 27B, keep Thinking Off, run TC17 first, and only proceed to TC12 after TC17 meets the documented semantic target.

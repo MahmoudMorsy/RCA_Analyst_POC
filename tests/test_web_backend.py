@@ -83,8 +83,8 @@ def test_health_config_and_frontend_load(tmp_path):
     client = TestClient(app)
     health = client.get("/api/v1/health")
     assert health.status_code == 200
-    assert health.json()["backend_version"] == "1.8.6"
-    assert health.json()["core_version"] == "0.8.5"
+    assert health.json()["backend_version"] == "1.8.7"
+    assert health.json()["core_version"] == "0.8.6"
     assert client.get("/api/v1/config").status_code == 200
     html = client.get("/").text
     for token in ("Backend Profile Details", "Analyze Case", "Live Pipeline", "RCA Configuration", "Stop / Abort", "Run History / Benchmarking"):
@@ -260,9 +260,9 @@ def test_release_documentation_set_exists():
     root = Path(__file__).resolve().parent.parent
     required = [
         "README.md", "CHANGELOG.md", "VERSION_HISTORY.md", "docs/ARCHITECTURE.md",
-        "docs/V1.8.6_RELEASE_NOTES.md", "docs/API.md", "docs/CONFIGURATION.md",
+        "docs/V1.8.7_RELEASE_NOTES.md", "docs/API.md", "docs/CONFIGURATION.md",
         "docs/DEPLOY_LOCAL_DELL.md", "docs/DEPLOY_RUNPOD.md", "docs/DEPLOY_HOME_AI_SERVER.md",
-        "docs/DESKTOP_UI_MIGRATION_MATRIX.md", "docs/RCA_CORE_ARCHITECTURE_v0.8.5.md",
+        "docs/DESKTOP_UI_MIGRATION_MATRIX.md", "docs/RCA_CORE_ARCHITECTURE_v0.8.6.md",
     ]
     for rel in required:
         assert (root / rel).exists(), rel

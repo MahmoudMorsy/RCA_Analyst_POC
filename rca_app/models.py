@@ -715,7 +715,7 @@ class SemanticPreparation(StrictModel):
 
 
 class RequirementCompilationBatch(StrictModel):
-    """One bounded fast-model requirement compilation batch."""
+    """One bounded semantic-model requirement compilation batch."""
 
     affected_functionality: str = ""
     requirement_irs: List[RequirementIR] = Field(default_factory=list)
@@ -725,6 +725,26 @@ class RequirementCompilationBatch(StrictModel):
     @classmethod
     def normalize_null_string_sentinels(cls, data):
         return _coerce_none_strings(data, {"affected_functionality"})
+
+
+class RequirementStructuralPatch(StrictModel):
+    """Explicit model-authored patch for transport-valid but non-executable IR fields.
+
+    All fields are optional because Python supplies the exact target-field list in
+    the request and rejects patches that modify untargeted fields. Python merges
+    only these structured objects; it never derives their semantics from prose.
+    """
+
+    requirement_id: str
+    condition: Optional[LogicExpression] = None
+    trigger: Optional[RequirementEventIR] = None
+    required_behavior: Optional[RequirementBehaviorIR] = None
+    timing: Optional[RequirementTimingIR] = None
+    persistence: Optional[RequirementPersistenceIR] = None
+
+
+class RequirementStructuralPatchBatch(StrictModel):
+    patches: List[RequirementStructuralPatch] = Field(default_factory=list)
 
 
 class EvidenceAnnotationBatch(StrictModel):
@@ -1134,6 +1154,12 @@ class ApiStats(StrictModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     reasoning_tokens: int = 0
+    # Some OpenAI-compatible providers (notably llama.cpp with Qwen-family
+    # templates) expose reasoning_content while omitting reasoning token detail.
+    # Preserve that observable fact instead of misleadingly reporting only 0.
+    reasoning_content_present: bool = False
+    reasoning_content_chars: int = 0
+    thinking_requested: str = "provider_default"
     retries: int = 0
     endpoint: str = ""
     model: str = ""

@@ -26,6 +26,8 @@ from rca_app.models import (
     RequirementEventIR,
     RequirementIR,
     RequirementCompilationBatch,
+    RequirementStructuralPatch,
+    RequirementStructuralPatchBatch,
     EvidenceAnnotationBatch,
     RequirementSemanticFingerprint,
     RequirementSemanticVerificationItem,
@@ -622,10 +624,12 @@ def test_v083_structural_completion_uses_fast_recompile_before_27b():
     bad = clean.model_copy(deep=True)
     bad.requirement_irs[0].condition.children[0].signal = ""
 
-    repaired_batch = RequirementCompilationBatch(
-        affected_functionality=clean.affected_functionality,
-        requirement_irs=[clean.requirement_irs[0].model_copy(deep=True)],
-    )
+    repaired_batch = RequirementStructuralPatchBatch(patches=[
+        RequirementStructuralPatch(
+            requirement_id="REQ-1701",
+            condition=clean.requirement_irs[0].condition.model_copy(deep=True),
+        )
+    ])
     bad_req_batch, bad_ev_batch = split_semantic_preparation(bad)
     fast = FakeStructuredClient([
         bad_req_batch,
@@ -650,9 +654,8 @@ def test_v083_structural_completion_uses_fast_recompile_before_27b():
     assert primary.calls == 0
     assert result.semantic_arbitration is None
     assert result_map(result.validated)["REQ-1701"].evaluation_status == EvaluationStatus.VIOLATED
-    assert not SemanticIntegrityChecker.structural_requirement_issues(
-        SemanticPreparation(requirement_irs=result.canonical_case.requirement_irs)
-    )
+    assert result.semantic_preparation is not None
+    assert not SemanticIntegrityChecker.structural_requirement_issues(result.semantic_preparation)
 
 
 def test_v084_tc17_malformed_evidence_envelope_is_transport_normalized_without_semantic_inference():
@@ -809,7 +812,7 @@ def test_v084_release_docs_are_packaged_in_source_tree():
     assert (root / "CHANGELOG.md").exists()
     history = (root / "VERSION_HISTORY.md").read_text(encoding="utf-8")
     assert "## v0.8.3 → v0.8.4" in history
-    assert "Current release:** v1.8.6" in history
+    assert "Current release:** v1.8.7" in history
 
 
 def test_v085_verifier_structured_fingerprint_catches_live_tc17_boolean_regrouping_even_when_marked_verified():

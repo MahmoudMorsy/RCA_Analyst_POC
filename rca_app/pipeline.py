@@ -36,6 +36,7 @@ from .models import (
     SourceAvailabilityNormalization,
     SemanticPreparation,
     RequirementCompilationBatch,
+    RequirementStructuralPatchBatch,
     EvidenceAnnotationBatch,
     RequirementSemanticVerificationBatch,
     SemanticIntegrityIssue,
@@ -61,8 +62,9 @@ from .prompts import (
     REQUIREMENT_REASONING_PROMPT,
     SEMANTIC_ANALYZER_PROMPT,
     TARGETED_REQUIREMENT_REPAIR_PROMPT,
-    REQUIREMENT_COMPILATION_V085_PROMPT,
-    EVIDENCE_ANNOTATION_V085_PROMPT,
+    REQUIREMENT_COMPILATION_V086_PROMPT,
+    REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT,
+    EVIDENCE_ANNOTATION_V086_PROMPT,
     REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
     SEMANTIC_ARBITRATION_PROMPT,
     RCA_SYNTHESIS_V080_PROMPT,
@@ -93,7 +95,7 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.5 adaptive semantic-compiler RCA architecture.
+    """v0.8.6 adaptive semantic-compiler RCA architecture.
 
     Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
@@ -413,17 +415,17 @@ class RCAPipeline:
             try:
                 try:
                     response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V086_PROMPT,
                         user_prompt=batch_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_compilation_v085",
+                        schema_name="rca_requirement_compilation_v086",
                     )
                 except AttributeError:
                     response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V086_PROMPT,
                         user_prompt=batch_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_compilation_v085",
+                        schema_name="rca_requirement_compilation_v086",
                     )
             except ModelGatewayError as exc:
                 stats.append(exc.stats)
@@ -467,67 +469,79 @@ class RCAPipeline:
         semantic_preparation = self._merge_semantic_preparation(compiled_batches, None)
         raw_llm_json = "\n\n".join(x for x in raw_parts if x)
 
-        # 06a: one cheap targeted structural completion pass when the fast
-        # compiler produced transport-valid but non-executable IR objects.
-        # Python identifies only missing/invalid structured fields; it never
-        # reconstructs their meaning from the requirement prose. The 4B must
-        # recompile affected requirements from the original source.
+        # 06a: one bounded targeted structural-completion pass when the semantic
+        # compiler produced transport-valid but non-executable IR fields. Python
+        # identifies only exact structured target fields; the model returns compact
+        # patches rather than regenerating complete Requirement IR objects.
         structural_issues = self.semantic_integrity_checker.structural_requirement_issues(semantic_preparation)
         if structural_issues:
-            repair_ids = sorted({x.requirement_id for x in structural_issues if x.requirement_id})
-            repair_batch = [x for x in canonical.requirements if x.requirement_id in repair_ids]
-            self._check_cancelled("4B structural IR completion")
-            structural_prompt = self._semantic_structural_repair_prompt(canonical, repair_batch, structural_issues)
+            targets = self._structural_completion_targets(semantic_preparation, structural_issues)
+            repair_ids = sorted(targets)
+            self._check_cancelled("semantic structural IR completion")
+            structural_prompt = self._semantic_structural_repair_prompt(canonical, semantic_preparation, structural_issues, targets)
             self._emit_trace(
                 trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "running",
-                f"Recompiling {len(repair_ids)} requirement(s) with transport-level IR defects before semantic verification.",
-                input_value={"requirement_ids": repair_ids, "issues": [x.model_dump(mode="json") for x in structural_issues]},
+                f"Completing exact non-executable IR fields for {len(repair_ids)} requirement(s) before semantic verification.",
+                input_value={
+                    "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
+                    "requirement_ids": repair_ids,
+                    "target_fields": targets,
+                    "issues": [x.model_dump(mode="json") for x in structural_issues],
+                    "request": json.loads(structural_prompt),
+                },
             )
             try:
+                # Structural completion should be compact even when the general
+                # semantic-preparation budget is large. The client-level thinking
+                # policy remains unchanged and is propagated by the transport.
+                completion_budget = min(int(getattr(self.semantic_preparation_client, "max_tokens", 3500) or 3500), 3500)
                 try:
-                    structural_response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
-                        user_prompt=structural_prompt,
-                        response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_structural_completion_v085",
-                    )
+                    completion_client = self.semantic_preparation_client.clone(max_tokens=max(1200, completion_budget))
                 except AttributeError:
-                    structural_response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
-                        user_prompt=structural_prompt,
-                        response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_structural_completion_v085",
-                    )
+                    completion_client = self.semantic_preparation_client
+                structural_response = completion_client.structured_repair(
+                    system_prompt=REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT,
+                    user_prompt=structural_prompt,
+                    response_model=RequirementStructuralPatchBatch,
+                    schema_name="rca_requirement_structural_patch_v086",
+                )
                 stats.append(structural_response.stats)
                 attempts.append(self._make_aux_attempt(
                     len(attempts) + 1, "semantic_structural_completion",
                     "SEMANTIC_STRUCTURAL_COMPLETION", structural_response
                 ))
-                semantic_preparation = self._replace_requirement_irs(
-                    semantic_preparation, structural_response.parsed.requirement_irs, repair_ids
+                self._validate_structural_patches(structural_response.parsed, targets)
+                semantic_preparation = self._apply_structural_patches(
+                    semantic_preparation, structural_response.parsed, targets
                 )
                 remaining_structural = self.semantic_integrity_checker.structural_requirement_issues(semantic_preparation)
                 self._emit_trace(
                     trace, "06a_structural_ir_completion", "Semantic Structural IR Completion",
                     "attention" if remaining_structural else "complete",
-                    f"Structural completion finished; {len(remaining_structural)} transport-level defect(s) remain and will be handled conservatively by verification/arbitration.",
-                    output_value=structural_response.parsed,
+                    f"Targeted structural completion finished; {len(remaining_structural)} transport-level defect(s) remain and will be handled conservatively by verification/arbitration.",
+                    output_value={
+                        "patches": structural_response.parsed,
+                        "remaining_issues": [x.model_dump(mode="json") for x in remaining_structural],
+                        "model_call": structural_response.stats,
+                        "finish_reason": structural_response.finish_reason,
+                    },
                 )
-            except ModelGatewayError as exc:
-                stats.append(exc.stats)
-                attempts.append(self._make_failed_attempt(
-                    len(attempts) + 1, "semantic_structural_completion",
-                    "SEMANTIC_STRUCTURAL_COMPLETION", exc
-                ))
+            except (ModelGatewayError, ValueError) as exc:
+                if isinstance(exc, ModelGatewayError):
+                    stats.append(exc.stats)
+                    attempts.append(self._make_failed_attempt(
+                        len(attempts) + 1, "semantic_structural_completion",
+                        "SEMANTIC_STRUCTURAL_COMPLETION", exc
+                    ))
                 self._emit_trace(
                     trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "attention",
-                    "The bounded cheap structural completion call failed; original partial IR is retained and the normal verifier/arbitration path remains authoritative.",
+                    "The bounded targeted structural completion did not yield an admissible patch; original partial IR is retained and the verifier/arbitration path remains authoritative.",
                     output_value={"error": str(exc)},
                 )
         else:
             self._emit_trace(
                 trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "skipped",
-                "No transport-level Requirement IR defect requires targeted recompilation.", output_value="Skipped."
+                "No transport-level Requirement IR defect requires targeted completion.", output_value="Skipped."
             )
 
         # 06b: independent evidence semantic annotation. This call is always
@@ -547,17 +561,17 @@ class RCAPipeline:
             try:
                 try:
                     response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V086_PROMPT,
                         user_prompt=evidence_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_annotation_v085",
+                        schema_name="rca_evidence_annotation_v086",
                     )
                 except AttributeError:
                     response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V086_PROMPT,
                         user_prompt=evidence_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_annotation_v085",
+                        schema_name="rca_evidence_annotation_v086",
                     )
             except ModelGatewayError as exc:
                 stats.append(exc.stats)
@@ -621,18 +635,25 @@ class RCAPipeline:
             )
             try:
                 try:
-                    evidence_repair_response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
+                    evidence_completion_budget = min(int(getattr(self.semantic_preparation_client, "max_tokens", 4000) or 4000), 4000)
+                    try:
+                        evidence_completion_client = self.semantic_preparation_client.clone(
+                            max_tokens=max(1600, evidence_completion_budget)
+                        )
+                    except AttributeError:
+                        evidence_completion_client = self.semantic_preparation_client
+                    evidence_repair_response = evidence_completion_client.structured_repair(
+                        system_prompt=EVIDENCE_ANNOTATION_V086_PROMPT,
                         user_prompt=evidence_repair_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_structural_completion_v085",
+                        schema_name="rca_evidence_structural_completion_v086",
                     )
                 except AttributeError:
                     evidence_repair_response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V086_PROMPT,
                         user_prompt=evidence_repair_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_structural_completion_v085",
+                        schema_name="rca_evidence_structural_completion_v086",
                     )
                 stats.append(evidence_repair_response.stats)
                 attempts.append(self._make_aux_attempt(
@@ -957,9 +978,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.5 analysis is ready for session export.",
+                         "Validated v0.8.6 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.5 analysis completed.")
+        progress("Complete", "v0.8.6 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1084,26 +1105,113 @@ class RCAPipeline:
         }
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
+    @staticmethod
+    def _logic_contains_semantic_id(node, semantic_id: str) -> bool:
+        if node is None or not semantic_id:
+            return False
+        if node.semantic_id == semantic_id:
+            return True
+        return any(RCAPipeline._logic_contains_semantic_id(child, semantic_id) for child in node.children)
+
     @classmethod
-    def _semantic_structural_repair_prompt(cls, canonical: CanonicalCase, batch: list, issues) -> str:
+    def _structural_completion_targets(cls, preparation: SemanticPreparation, issues) -> dict[str, list[str]]:
+        by_id = {x.requirement_id: x for x in preparation.requirement_irs}
+        targets: dict[str, set[str]] = {}
+        for issue in issues:
+            ir = by_id.get(issue.requirement_id)
+            if ir is None:
+                continue
+            field = ""
+            sid = issue.semantic_id
+            if ir.required_behavior is not None and sid and ir.required_behavior.semantic_id == sid:
+                field = "required_behavior"
+            elif ir.trigger is not None and sid and ir.trigger.semantic_id == sid:
+                field = "trigger"
+            elif ir.timing is not None and sid and ir.timing.semantic_id == sid:
+                field = "timing"
+            elif ir.persistence is not None and sid and ir.persistence.semantic_id == sid:
+                field = "persistence"
+            elif sid and cls._logic_contains_semantic_id(ir.condition, sid):
+                field = "condition"
+            else:
+                # Missing top-level objects can still be targeted from their
+                # explicit source-clause semantic IDs. This is structured linkage,
+                # not interpretation of the requirement prose.
+                clause = next((c for c in ir.source_clauses if c.semantic_id == sid), None)
+                role = clause.role.value if clause is not None else ""
+                field = {
+                    "CONDITION": "condition",
+                    "TRIGGER": "trigger",
+                    "REQUIRED_BEHAVIOR": "required_behavior",
+                    "TIMING": "timing",
+                    "PERSISTENCE": "persistence",
+                }.get(role, "")
+            if field:
+                targets.setdefault(ir.requirement_id, set()).add(field)
+        return {rid: sorted(fields) for rid, fields in targets.items()}
+
+    @classmethod
+    def _semantic_structural_repair_prompt(cls, canonical: CanonicalCase, preparation: SemanticPreparation, issues, targets) -> str:
+        ir_by_id = {x.requirement_id: x for x in preparation.requirement_irs}
+        req_by_id = {x.requirement_id: x for x in canonical.requirements}
+        rows = []
+        for rid, fields in sorted(targets.items()):
+            ir = ir_by_id.get(rid)
+            req = req_by_id.get(rid)
+            if ir is None or req is None:
+                continue
+            field_context = {}
+            for field in fields:
+                value = getattr(ir, field, None)
+                field_context[field] = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+            semantic_ids = sorted({x.semantic_id for x in issues if x.requirement_id == rid and x.semantic_id})
+            rows.append({
+                "requirement_id": rid,
+                "original_requirement": req.requirement_text,
+                "target_fields": fields,
+                "target_semantic_ids": semantic_ids,
+                "current_target_values": field_context,
+                "defects": [x.description for x in issues if x.requirement_id == rid],
+            })
         payload = {
-            "ticket_context": {
-                "ticket_id": canonical.ticket_id,
-                "title": canonical.title,
-                "description": canonical.description,
-            },
-            "requirements_to_compile": [cls._compact_requirement_reference(x) for x in batch],
-            "reference_requirements": [cls._compact_requirement_reference(x) for x in canonical.requirements],
-            "structural_defects_from_previous_transport": [x.model_dump(mode="json") for x in issues],
-            "user_instructions": canonical.user_instructions,
-            "instruction": (
-                "Recompile exactly requirements_to_compile independently from their ORIGINAL requirement text. "
-                "The previous output was transport-valid but structurally non-executable. Do not infer or repair semantics in Python; "
-                "you must return complete executable IR fields. Every PREDICATE node must explicitly contain signal, operator, and value. "
-                "Do not return IRs for reference_requirements unless also listed in requirements_to_compile."
-            ),
+            "requirements": rows,
+            "instruction": "Return compact patches for only target_fields. Do not regenerate or repeat already-valid IR fields.",
         }
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+
+    @staticmethod
+    def _validate_structural_patches(batch: RequirementStructuralPatchBatch, targets: dict[str, list[str]]) -> None:
+        allowed_patch_fields = {"condition", "trigger", "required_behavior", "timing", "persistence"}
+        seen = set()
+        for patch in batch.patches:
+            if patch.requirement_id not in targets:
+                raise ValueError(f"Structural completion returned untargeted requirement {patch.requirement_id}")
+            if patch.requirement_id in seen:
+                raise ValueError(f"Structural completion returned duplicate patch for {patch.requirement_id}")
+            seen.add(patch.requirement_id)
+            supplied = {name for name in allowed_patch_fields if name in patch.model_fields_set and getattr(patch, name) is not None}
+            unexpected = supplied - set(targets[patch.requirement_id])
+            if unexpected:
+                raise ValueError(
+                    f"Structural completion attempted untargeted fields for {patch.requirement_id}: {sorted(unexpected)}"
+                )
+            if not supplied:
+                raise ValueError(f"Structural completion returned no target field for {patch.requirement_id}")
+
+    @staticmethod
+    def _apply_structural_patches(preparation: SemanticPreparation, batch: RequirementStructuralPatchBatch, targets: dict[str, list[str]]) -> SemanticPreparation:
+        out = copy.deepcopy(preparation)
+        patches = {x.requirement_id: x for x in batch.patches}
+        for ir in out.requirement_irs:
+            patch = patches.get(ir.requirement_id)
+            if patch is None:
+                continue
+            for field in targets.get(ir.requirement_id, []):
+                if field in patch.model_fields_set:
+                    value = getattr(patch, field)
+                    if value is not None:
+                        setattr(ir, field, copy.deepcopy(value))
+        return out
 
     @staticmethod
     def _replace_requirement_irs(preparation: SemanticPreparation, replacements: list, allowed_ids: list[str]) -> SemanticPreparation:

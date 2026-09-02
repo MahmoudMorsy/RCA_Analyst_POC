@@ -9,6 +9,8 @@ from .models import (
     EvidenceSemanticRole,
     LogicExpression,
     LogicKind,
+    NormativeType,
+    PredicateOperator,
     RequirementIR,
     ScopeResolution,
     SemanticArbitrationResponse,
@@ -134,6 +136,12 @@ class SemanticIntegrityChecker:
 
         for ir in preparation.requirement_irs:
             walk(ir, ir.condition)
+            condition_clause = next((c for c in ir.source_clauses if c.role == SemanticClauseRole.CONDITION), None)
+            behavior_clause = next((c for c in ir.source_clauses if c.role == SemanticClauseRole.REQUIRED_BEHAVIOR), None)
+            if ir.condition is None and condition_clause is not None:
+                add(ir, "Requirement condition is missing despite an explicit CONDITION source clause.", condition_clause.semantic_id)
+            if ir.normative_type in {NormativeType.MANDATORY, NormativeType.PROHIBITIVE} and ir.required_behavior is None and behavior_clause is not None:
+                add(ir, "Requirement required_behavior is missing despite an explicit REQUIRED_BEHAVIOR source clause.", behavior_clause.semantic_id)
             if ir.trigger is not None:
                 if not ir.trigger.signal.strip():
                     add(ir, "Requirement trigger object is missing signal.", ir.trigger.semantic_id)
@@ -142,8 +150,18 @@ class SemanticIntegrityChecker:
             if ir.required_behavior is not None:
                 if not ir.required_behavior.signal.strip() and not ir.required_behavior.process_description.strip():
                     add(ir, "Requirement required_behavior object is missing signal/process description.", ir.required_behavior.semantic_id)
+                if ir.required_behavior.signal.strip() and ir.required_behavior.operator == PredicateOperator.OTHER:
+                    add(ir, "Signal-based required_behavior is missing an executable operator.", ir.required_behavior.semantic_id)
+                if (
+                    ir.required_behavior.signal.strip()
+                    and ir.required_behavior.operator not in {PredicateOperator.PRESENT, PredicateOperator.ABSENT, PredicateOperator.OTHER}
+                    and not ir.required_behavior.value.strip()
+                ):
+                    add(ir, "Signal-based required_behavior is missing value.", ir.required_behavior.semantic_id)
             if ir.timing is not None and ir.timing.limit_ms is None:
                 add(ir, "Requirement timing object is missing limit_ms.", ir.timing.semantic_id)
+            if ir.persistence is not None and not ir.persistence.required:
+                add(ir, "Requirement persistence object is present but required is false.", ir.persistence.semantic_id)
         return issues
 
     @classmethod
@@ -194,14 +212,12 @@ class SemanticIntegrityChecker:
                 )
                 if material and not fact.subject.strip():
                     add(ann, fact.fact_id, "Material evidence fact is missing subject.", True)
-                if (
-                    fact.temporal_semantics == TemporalSemantics.PERSISTENT_STATE
-                    and fact.scope.resolution == ScopeResolution.RESOLVED
-                    and not fact.scope.scope_id.strip()
+                if fact.temporal_semantics == TemporalSemantics.PERSISTENT_STATE and (
+                    fact.scope.resolution != ScopeResolution.RESOLVED or not fact.scope.scope_id.strip()
                 ):
                     add(
                         ann, fact.fact_id,
-                        "Persistent natural-language evidence claims RESOLVED scope but has no concrete scope_id.",
+                        "Persistent natural-language evidence has no concrete scope_id and/or scope.resolution is not RESOLVED; it is non-executable.",
                         material,
                     )
         return issues
@@ -305,15 +321,20 @@ class SemanticIntegrityChecker:
                 add("Evidence annotation references an unknown canonical evidence ID.", evidence_id=ann.evidence_id, material=True)
                 continue
             if ann.resolution != SemanticResolution.VERIFIED:
+                # A requirement-id association alone does not make unresolved
+                # narrative context compliance-material. Materiality requires an
+                # explicit evidence role here; structured signal dependencies are
+                # checked independently below. This prevents ticket-title/hedged
+                # summary ambiguity from blocking otherwise executable evidence.
                 material = any(
                     role in MATERIAL_EVIDENCE_ROLES
                     for fact in ann.facts for role in fact.possible_roles
-                ) or any(fact.related_requirement_ids for fact in ann.facts)
+                )
                 add(f"Evidence annotation remains {ann.resolution.value}.", evidence_id=ann.evidence_id, material=material)
             for fact in ann.facts:
                 if not cls._span_supported(item.raw_source_text or item.text, fact.source_phrase):
                     add("Evidence semantic source phrase is not grounded in its canonical evidence item.", evidence_id=ann.evidence_id, semantic_id=fact.fact_id, material=True)
-                material = bool(set(fact.possible_roles) & MATERIAL_EVIDENCE_ROLES) or bool(fact.related_requirement_ids)
+                material = bool(set(fact.possible_roles) & MATERIAL_EVIDENCE_ROLES)
                 if fact.resolution != SemanticResolution.VERIFIED:
                     add(f"Evidence fact remains {fact.resolution.value}: {fact.notes or fact.source_phrase}", evidence_id=ann.evidence_id, semantic_id=fact.fact_id, material=material)
                 if fact.scope.resolution in {ScopeResolution.UNRESOLVED, ScopeResolution.PARTIAL}:
@@ -323,15 +344,24 @@ class SemanticIntegrityChecker:
                         semantic_id=fact.fact_id,
                         material=material,
                     )
+            material_ann = any(
+                bool(set(fact.possible_roles) & MATERIAL_EVIDENCE_ROLES)
+                for fact in ann.facts
+            )
             for note in ann.unresolved_semantics:
-                add(f"Evidence semantic ambiguity remains unresolved: {note}", evidence_id=ann.evidence_id, material=True)
+                add(
+                    f"Evidence semantic ambiguity remains unresolved: {note}",
+                    evidence_id=ann.evidence_id,
+                    material=material_ann,
+                )
 
         for note in preparation.unresolved_case_semantics:
             add(f"Case-level semantic ambiguity remains unresolved: {note}", material=True)
 
-        # Dependency-based materiality without reading language: if a fact's
-        # subject is used by an IR and its scope is unresolved, it can block that
-        # requirement even when the compiler omitted explicit related IDs.
+        # Dependency-based materiality without reading language: if an unresolved
+        # fact's structured subject is used by an IR, it can block that requirement
+        # even when the annotator omitted evidence roles. The same applies to an
+        # otherwise-verified persistent fact whose scope is unresolved.
         subjects_by_req: Dict[str, Set[str]] = {}
         for ir in preparation.requirement_irs:
             subjects: Set[str] = set()
@@ -345,13 +375,16 @@ class SemanticIntegrityChecker:
         material_keys = {(i.evidence_id, i.semantic_id) for i in issues if i.material_to_compliance}
         for ann in preparation.evidence_annotations:
             for fact in ann.facts:
-                if fact.scope.resolution not in {ScopeResolution.UNRESOLVED, ScopeResolution.PARTIAL} or not fact.subject:
+                unresolved_fact = fact.resolution != SemanticResolution.VERIFIED
+                unresolved_scope = fact.scope.resolution in {ScopeResolution.UNRESOLVED, ScopeResolution.PARTIAL}
+                if not (unresolved_fact or unresolved_scope) or not fact.subject:
                     continue
                 impacted = [rid for rid, subjects in subjects_by_req.items() if fact.subject.lower() in subjects]
                 key = (ann.evidence_id, fact.fact_id)
                 if impacted and key not in material_keys:
+                    reason = "semantic fact" if unresolved_fact else "scope"
                     add(
-                        "Unresolved evidence scope lies on a structured dependency used by requirement(s): " + ", ".join(impacted),
+                        f"Unresolved evidence {reason} lies on a structured dependency used by requirement(s): " + ", ".join(impacted),
                         evidence_id=ann.evidence_id,
                         semantic_id=fact.fact_id,
                         material=True,

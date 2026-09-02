@@ -1,11 +1,11 @@
-# RCA Analyst v1.8.6 — Web UI + Hardware-Independent RCA Backend
+# RCA Analyst v1.8.7 — Web UI + Hardware-Independent RCA Backend
 
-**Application version:** v1.8.6  
-**Embedded RCA Core:** v0.8.5 candidate
+**Application version:** v1.8.7  
+**Embedded RCA Core:** v0.8.6 candidate
 
-v1.8.6 is an evidence-driven repair release built from the v1.8.5 Web/FastAPI package and live Dell/RunPod sessions. It fixes Web observability/model-configuration defects and hardens two semantic boundaries exposed by TC17/TC12 without moving natural-language interpretation into Python or weakening frozen evidence rules.
+v1.8.7 is a live-TC17-driven semantic transport/completion hardening release built on the clean v1.8.6 Web/FastAPI baseline. It makes Thinking Off effective for llama.cpp/Qwen requests, makes reasoning text observable, replaces full semantic structural regeneration with targeted patches, and tightens evidence scope/materiality and arbitration provenance without moving natural-language interpretation into Python or weakening frozen evidence rules.
 
-RCA Core v0.8.5 is **not frozen** until the planned live TC17/TC12 reruns pass. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.6 is **not frozen** until the planned live TC17/TC12 reruns pass. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 ## Architecture at a glance
 
@@ -17,7 +17,7 @@ RCA Backend API /api/v1
     │
     ├── asynchronous Run Manager
     ├── Storage / Sessions / History / Telemetry
-    ├── RCA Core v0.8.5
+    ├── RCA Core v0.8.6
     │       │
     │       ├── Small / Utility model roles
     │       ├── Critical Semantic Model Routing
@@ -35,22 +35,19 @@ RCA Backend API /api/v1
 
 The browser contains **zero RCA decision logic**. Model capacity may change by role, but Python remains authoritative for deterministic applicability/compliance/timing/evidence mechanics.
 
-## v1.8.6 highlights
+## v1.8.7 highlights
 
-- completed pipeline stages preserve their original Stage Input and structured I/O;
-- human-readable structured Stage Input/Output with Raw JSON fallback;
-- per-testcase selection populates Final Report, Validation, Canonical Input, Structured JSON, LLM Attempts, Repair Routing, logs, pipeline and statistics for batch runs;
-- batch results are persisted incrementally after every successful or failed case;
-- per-testcase and per-stage timings/token/model-call statistics;
-- current-form endpoint model discovery/test; saving first is no longer required;
-- deployment environment model overrides are visible instead of silently masquerading as failed saves;
-- explicit per-run configuration snapshots allow controlled model-routing experiments without editing/killing model servers;
-- critical semantic preparation and verification may independently use Small / Utility or Primary model roles;
-- independent verifier must return a structured source-semantic fingerprint that Python compares against compiler IR;
-- arbitration rejects notes-only compliance evidence pseudo-repairs;
-- evidence prompts explicitly constrain schema enums without Python NLP mappings.
+- explicit Qwen/llama.cpp request-level Thinking Off/On propagation through `chat_template_kwargs.enable_thinking`;
+- reasoning-content presence/character telemetry even when the provider reports zero reasoning tokens;
+- targeted `RequirementStructuralPatchBatch` completion that repairs only Python-identified broken fields instead of regenerating valid IR;
+- compact bounded structural/evidence completion budgets to stop TC17-style 12K+12K repair explosions;
+- stronger signal/value behavior executability checks and grounded negative-predicate/persistence contracts;
+- persistent language evidence requires a concrete resolved scope, with `CASE_EVALUATED_INTERVAL` available only when the source explicitly resolves whole evaluated-interval coverage;
+- evidence materiality based on explicit roles and structured Requirement-IR dependencies instead of requirement-ID association alone;
+- arbitration repairs must carry provenance directly on executable nodes; notes/separate clause IDs remain insufficient;
+- v1.8.6 Web observability, batch parity, model routing, current-form discovery and environment-override behavior remain intact.
 
-See [`docs/V1.8.6_RELEASE_NOTES.md`](docs/V1.8.6_RELEASE_NOTES.md) for the live failure evidence and exact changes.
+See [`docs/V1.8.7_RELEASE_NOTES.md`](docs/V1.8.7_RELEASE_NOTES.md) for the live failure evidence and exact changes.
 
 ## Start the local Web application
 
@@ -79,7 +76,7 @@ This lets RunPod test a stronger semantic model without changing utility intake/
 
 ## External model-server context and inference settings
 
-The v1.8.6 backend does **not** start/restart external LM Studio/llama.cpp/vLLM processes. Therefore a server launched as:
+The v1.8.7 backend does **not** start/restart external LM Studio/llama.cpp/vLLM processes. Therefore a server launched as:
 
 ```text
 llama-server ... -c 8192
@@ -143,7 +140,7 @@ RCA_PRIMARY_PROVIDER=openai-compatible
 RCA_SMALL_PROVIDER=openai-compatible
 ```
 
-These remain deployment-time defaults. v1.8.6 exposes active overrides in the Web UI and snapshots the current form into each run's `config_override`, avoiding the v1.8.5 ambiguity where a save could appear to revert after an environment override was reapplied.
+These remain deployment-time defaults. v1.8.7 exposes active overrides in the Web UI and snapshots the current form into each run's `config_override`, avoiding the v1.8.5 ambiguity where a save could appear to revert after an environment override was reapplied.
 
 ## Remote security
 
@@ -174,15 +171,15 @@ Do not remove it until Web parity is live-proven.
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current v1.8.6 application architecture
-- [`docs/RCA_CORE_ARCHITECTURE_v0.8.5.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.5.md) — current semantic-core architecture
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current v1.8.7 application architecture
+- [`docs/RCA_CORE_ARCHITECTURE_v0.8.6.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.6.md) — current semantic-core architecture
 - [`docs/DESKTOP_UI_MIGRATION_MATRIX.md`](docs/DESKTOP_UI_MIGRATION_MATRIX.md) — desktop → Web parity contract
 - [`docs/API.md`](docs/API.md)
 - [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - [`docs/DEPLOY_LOCAL_DELL.md`](docs/DEPLOY_LOCAL_DELL.md)
 - [`docs/DEPLOY_RUNPOD.md`](docs/DEPLOY_RUNPOD.md)
 - [`docs/DEPLOY_HOME_AI_SERVER.md`](docs/DEPLOY_HOME_AI_SERVER.md)
-- [`docs/V1.8.6_RELEASE_NOTES.md`](docs/V1.8.6_RELEASE_NOTES.md)
+- [`docs/V1.8.7_RELEASE_NOTES.md`](docs/V1.8.7_RELEASE_NOTES.md)
 - [`VERSION_HISTORY.md`](VERSION_HISTORY.md)
 - [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -194,6 +191,6 @@ Historical v0.8.4/v1.8.4/v1.8.5 architecture and release documents remain packag
 pytest -q
 ```
 
-v1.8.6 release validation: **201 passed** in the working tree and **201 passed** from a clean fresh extraction.
+v1.8.7 release validation: **207 passed** in the working tree and **207 passed** from a clean fresh extraction.
 
-Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun TC17 and TC12 using the intended Dell/RunPod model configurations before considering RCA Core v0.8.5 frozen.
+Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun TC17 and TC12 using the intended Dell/RunPod model configurations before considering RCA Core v0.8.6 frozen.

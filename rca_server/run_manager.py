@@ -252,16 +252,20 @@ class RunManager:
         prompt = sum(int(x.get("prompt_tokens") or 0) for x in calls)
         completion = sum(int(x.get("completion_tokens") or 0) for x in calls)
         reasoning = sum(int(x.get("reasoning_tokens") or 0) for x in calls)
+        reasoning_chars = sum(int(x.get("reasoning_content_chars") or 0) for x in calls)
+        reasoning_content_calls = sum(1 for x in calls if x.get("reasoning_content_present"))
         model_seconds = sum(float(x.get("request_duration_seconds") or 0.0) for x in calls)
         by_model_role: dict[str, dict[str, Any]] = {}
         for call in calls:
             key = call.get("model_role") or "UNSPECIFIED"
-            row = by_model_role.setdefault(key, {"calls": 0, "seconds": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "reasoning_tokens": 0})
+            row = by_model_role.setdefault(key, {"calls": 0, "seconds": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "reasoning_tokens": 0, "reasoning_content_chars": 0, "reasoning_content_calls": 0})
             row["calls"] += 1
             row["seconds"] += float(call.get("request_duration_seconds") or 0.0)
             row["prompt_tokens"] += int(call.get("prompt_tokens") or 0)
             row["completion_tokens"] += int(call.get("completion_tokens") or 0)
             row["reasoning_tokens"] += int(call.get("reasoning_tokens") or 0)
+            row["reasoning_content_chars"] += int(call.get("reasoning_content_chars") or 0)
+            row["reasoning_content_calls"] += 1 if call.get("reasoning_content_present") else 0
         req_counts: dict[str, int] = {}
         payload = record.get("result") or {}
         for row in ((payload.get("validated") or {}).get("requirement_results") or []):
@@ -275,6 +279,8 @@ class RunManager:
             "prompt_tokens": prompt,
             "completion_tokens": completion,
             "reasoning_tokens": reasoning,
+            "reasoning_content_chars": reasoning_chars,
+            "reasoning_content_calls": reasoning_content_calls,
             "total_tokens": prompt + completion,
             "weighted_generation_tokens_per_second": round(completion / model_seconds, 3) if model_seconds > 0 else None,
             "retries": sum(int(x.get("retries") or 0) for x in calls),
@@ -423,6 +429,9 @@ class RunManager:
                 "prompt_tokens": int(stat.get("prompt_tokens") or 0),
                 "completion_tokens": completion,
                 "reasoning_tokens": int(stat.get("reasoning_tokens") or 0),
+                "reasoning_content_present": bool(stat.get("reasoning_content_present")),
+                "reasoning_content_chars": int(stat.get("reasoning_content_chars") or 0),
+                "thinking_requested": str(stat.get("thinking_requested") or "provider_default"),
                 "total_tokens": int(stat.get("total_tokens") or 0),
                 "request_duration_seconds": elapsed,
                 "generation_tokens_per_second": round(completion / elapsed, 3) if elapsed > 0 else None,
@@ -481,6 +490,9 @@ class RunManager:
                 "prompt_tokens": sum(int(x.get("prompt_tokens") or 0) for x in calls),
                 "completion_tokens": completion,
                 "reasoning_tokens": sum(int(x.get("reasoning_tokens") or 0) for x in calls),
+                "reasoning_content_chars": sum(int(x.get("reasoning_content_chars") or 0) for x in calls),
+                "reasoning_content_calls": sum(1 for x in calls if x.get("reasoning_content_present")),
+                "thinking_requested": sorted({str(x.get("thinking_requested") or "provider_default") for x in calls}),
                 "total_tokens": sum(int(x.get("total_tokens") or 0) for x in calls),
                 "retries": sum(int(x.get("retries") or 0) for x in calls),
                 "weighted_generation_tokens_per_second": round(completion / seconds, 3) if seconds > 0 else None,
