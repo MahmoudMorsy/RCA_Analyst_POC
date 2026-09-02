@@ -1,0 +1,47 @@
+CURRENT TICKET
+Ticket ID: TEST-017
+Title:
+Mixed German-English starter condition with nested logic and a voltage threshold.
+
+Description:
+StarterEnable is FALSE even though the observed operating point appears to satisfy the nested enable condition. Additional requirements cover low-voltage and service-mode behavior.
+
+TEST INFORMATION
+Test Steps:
+1. Set Zündung / IgnitionState to ON.
+2. Select GearPosition N.
+3. Keep ServiceMode INACTIVE.
+4. Verify StarterEnable is TRUE.
+
+Reported Test Result:
+StarterEnable remained FALSE at the verification point.
+
+SYSTEM REQUIREMENTS
+
+REQ-1701
+Wenn IgnitionState = ON und (GearPosition = P oder GearPosition = N) and ServiceMode is not ACTIVE, StarterEnable shall be TRUE.
+
+REQ-1702
+If BatteryVoltage is below 9.5 V, StarterEnable shall be FALSE.
+
+REQ-1703
+Wenn ServiceMode = ACTIVE, StarterEnable shall remain FALSE.
+
+HISTORICAL TICKETS
+None provided.
+
+CURRENT BZD / DIAGNOSTICS
+Not available.
+
+CURRENT TRACE / DIRECT OBSERVATIONS
+BatteryVoltage remained 12.2 throughout the complete evaluated interval.
+ServiceMode remained INACTIVE throughout the complete evaluated interval.
+Snapshot ID: START_POINT
+IgnitionState = ON
+GearPosition = N
+StarterEnable = FALSE
+
+TASK
+Interpret the supplied German/English requirement wording without simplifying away the nested AND/OR logic.
+Do not treat an opposite point or unrelated requirement as a replacement for the requirement's own condition.
+Do not invent missing information.

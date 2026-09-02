@@ -1,0 +1,47 @@
+CURRENT TICKET
+Ticket ID: TEST-003
+Title:
+Function activation exceeds allowed response time.
+
+Description:
+Function X activates, but the activation appears delayed compared with the specified response time.
+
+TEST INFORMATION
+Test Steps:
+1. Set IgnitionState to ON.
+2. Ensure AvailabilityStatus is AVAILABLE.
+3. Set FunctionRequest to ACTIVE.
+4. Verify FunctionStatus becomes ACTIVE within 500 ms.
+
+Reported Test Result:
+FunctionStatus became ACTIVE later than expected.
+
+SYSTEM REQUIREMENTS
+
+REQ-201
+When FunctionRequest becomes ACTIVE, FunctionStatus shall become ACTIVE within 500 ms.
+
+REQ-202
+If AvailabilityStatus is NOT_AVAILABLE, FunctionStatus shall remain INACTIVE.
+
+HISTORICAL TICKETS
+None provided.
+
+CURRENT BZD / DIAGNOSTICS
+Not available.
+
+CURRENT TRACE / DIRECT OBSERVATIONS
+Clock ID: TRACE_A
+Event Coverage Complete: true
+10.000 s IgnitionState = ON
+AvailabilityStatus remained AVAILABLE throughout the complete evaluated interval.
+10.000 s FunctionRequest = INACTIVE
+10.100 s FunctionRequest = ACTIVE
+10.100 s FunctionStatus = INACTIVE
+10.300 s FunctionStatus = INACTIVE
+10.500 s FunctionStatus = INACTIVE
+10.650 s FunctionStatus = ACTIVE
+
+TASK
+Analyze the current ticket strictly using the supplied engineering evidence.
+Do not invent missing information.

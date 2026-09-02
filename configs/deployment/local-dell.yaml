@@ -1,0 +1,16 @@
+deployment:
+  profile_name: Local Dell
+  type: local
+  bind_host: 127.0.0.1
+  port: 8000
+  storage_root: ~/.rca_analyst_poc/web_backend
+  auth_required: false
+  cors_origins:
+    - http://localhost:8000
+    - http://127.0.0.1:8000
+  description: Fully local Dell deployment. RCA backend, storage, and OpenAI-compatible model service run locally.
+  feature_overrides:
+    gpu_offload: true
+    tensor_split: false
+    flash_attention: false
+    parallel_inference: false

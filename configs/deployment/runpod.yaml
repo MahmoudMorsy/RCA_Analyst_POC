@@ -1,0 +1,14 @@
+deployment:
+  profile_name: RunPod Development
+  type: runpod
+  bind_host: 0.0.0.0
+  port: 8000
+  storage_root: /workspace/rca-data
+  auth_required: true
+  cors_origins: []
+  description: Remote GPU development profile. Set RCA_API_TOKEN and RCA_CORS_ORIGINS in the environment before exposing the API.
+  feature_overrides:
+    gpu_offload: true
+    tensor_split: false
+    flash_attention: true
+    parallel_inference: true

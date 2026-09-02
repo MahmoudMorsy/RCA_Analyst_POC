@@ -1,0 +1,14 @@
+deployment:
+  profile_name: Home AI Server
+  type: home
+  bind_host: 0.0.0.0
+  port: 8000
+  storage_root: ~/rca-data
+  auth_required: true
+  cors_origins: []
+  description: Future dedicated AI workstation/server profile. Hardware/model provider is configured independently.
+  feature_overrides:
+    gpu_offload: true
+    tensor_split: true
+    flash_attention: true
+    parallel_inference: true

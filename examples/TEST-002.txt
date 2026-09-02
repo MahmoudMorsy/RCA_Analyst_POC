@@ -1,0 +1,46 @@
+CURRENT TICKET
+Ticket ID: TEST-002
+Title:
+Incorrect activation state under valid runtime conditions.
+
+Description:
+Function X is expected to operate under the configured test conditions, but the reported result indicates that the function is inactive.
+
+TEST INFORMATION
+Test Steps:
+1. Set IgnitionState to ON.
+2. Ensure AvailabilityStatus is AVAILABLE.
+3. Verify FunctionStatus is ACTIVE.
+4. Verify WarningIndicator is OFF.
+
+Reported Test Result:
+FunctionStatus was INACTIVE.
+
+SYSTEM REQUIREMENTS
+
+REQ-101
+If IgnitionState is ON and AvailabilityStatus is AVAILABLE, FunctionStatus shall be ACTIVE.
+
+REQ-102
+If AvailabilityStatus is AVAILABLE, WarningIndicator shall be OFF.
+
+REQ-103
+If AvailabilityStatus is NOT_AVAILABLE, FunctionStatus shall remain INACTIVE.
+
+HISTORICAL TICKETS
+None provided.
+
+CURRENT BZD / DIAGNOSTICS
+Not available.
+
+CURRENT TRACE / DIRECT OBSERVATIONS
+During the evaluated observation interval:
+Snapshot ID: VERIFY_POINT_1
+IgnitionState = ON
+AvailabilityStatus remained AVAILABLE throughout the complete evaluated interval.
+FunctionStatus = INACTIVE
+WarningIndicator = OFF
+
+TASK
+Analyze the current ticket strictly using the supplied engineering evidence.
+Do not invent missing information.

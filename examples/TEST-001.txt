@@ -1,0 +1,36 @@
+CURRENT TICKET
+Ticket ID: TEST-001
+Title:
+Function does not activate.
+Description:
+The user activates Function X, but the function remains inactive.
+
+TEST INFORMATION
+Test Steps:
+1. Set IgnitionState to ON.
+2. Ensure AvailabilityStatus is AVAILABLE.
+3. Set FunctionRequest to ACTIVE.
+4. Verify FunctionStatus becomes ACTIVE.
+
+Reported Test Result:
+FunctionStatus did not become ACTIVE.
+
+SYSTEM REQUIREMENTS
+REQ-001
+If IgnitionState is ON and AvailabilityStatus is AVAILABLE, FunctionRequest may be accepted.
+
+REQ-002
+When FunctionRequest becomes ACTIVE, FunctionStatus shall become ACTIVE within 500 ms.
+
+REQ-003
+If AvailabilityStatus is NOT_AVAILABLE, FunctionStatus shall remain INACTIVE.
+
+HISTORICAL TICKETS
+None provided.
+
+CURRENT BZD / DIAGNOSTICS
+Not available.
+
+TASK
+Analyze the current ticket strictly using the supplied engineering evidence.
+Do not invent missing information.

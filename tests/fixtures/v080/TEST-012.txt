@@ -1,0 +1,73 @@
+CURRENT TICKET
+Ticket ID: TEST-012
+Title:
+Power tailgate opens too late in the POWER variant while many similar body-access requirements exist.
+
+Description:
+The vehicle is configured for the POWER tailgate variant. A tailgate OPEN request is observed, but TailgateStatus reaches OPEN after the permitted response time. The supplied requirement set intentionally contains several similar body-access obligations for other doors, variants, and functions.
+
+TEST INFORMATION
+Test Steps:
+1. Set IgnitionState to ON.
+2. Confirm ActiveVariant is POWER and VehicleSpeed is 0.
+3. Set TailgateRequest to OPEN.
+4. Verify TailgateStatus becomes OPEN within 800 ms.
+
+Reported Test Result:
+TailgateStatus became OPEN later than the 800 ms requirement.
+
+SYSTEM REQUIREMENTS
+
+REQ-1201
+If IgnitionState is ON, CentralLockStatus shall be READY.
+
+REQ-1202
+If VehicleSpeed is above 0, TailgateRequest shall not be accepted.
+
+REQ-1203
+When DriverDoorRequest becomes OPEN, DriverDoorStatus shall become OPEN within 300 ms.
+
+REQ-1204
+When TailgateRequest becomes OPEN, TailgateStatus shall become OPEN within 800 ms.
+
+REQ-1205
+When RearLeftDoorRequest becomes OPEN, RearLeftDoorStatus shall become OPEN within 300 ms.
+
+REQ-1206
+If ActiveVariant is MANUAL and VehicleSpeed is above 0, TailgateStatus shall remain CLOSED.
+
+REQ-1207
+If ActiveVariant is POWER, TailgateMotorAvailability shall be AVAILABLE.
+
+REQ-1208
+If ChildLockState is ON, RearRightDoorStatus shall remain CLOSED.
+
+REQ-1209
+When BonnetRequest becomes OPEN, BonnetStatus shall become OPEN within 500 ms.
+
+REQ-1210
+When ComfortClosing becomes ACTIVE, WindowStatus shall become CLOSED within 2000 ms.
+
+HISTORICAL TICKETS
+None provided.
+
+CURRENT BZD / DIAGNOSTICS
+Not available.
+
+CURRENT TRACE / DIRECT OBSERVATIONS
+Clock ID: TRACE_BODY
+Event Coverage Complete: true
+IgnitionState remained ON throughout the complete evaluated interval.
+ActiveVariant remained POWER throughout the complete evaluated interval.
+VehicleSpeed remained 0 throughout the complete evaluated interval.
+TailgateMotorAvailability remained AVAILABLE throughout the complete evaluated interval.
+99.900 s TailgateRequest = CLOSED
+100.000 s TailgateRequest = OPEN
+100.000 s TailgateStatus = CLOSED
+100.600 s TailgateStatus = CLOSED
+101.100 s TailgateStatus = OPEN
+
+TASK
+Analyze every supplied requirement independently even though many are distractors.
+Do not import a trigger, signal, variant, or condition from a similarly named requirement.
+Do not invent missing information.

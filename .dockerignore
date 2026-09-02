@@ -1,0 +1,8 @@
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+batch_results
+rca-data
+.git

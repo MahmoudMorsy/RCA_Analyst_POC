@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA Analyst</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">R</span><div><strong>RCA Analyst</strong><small id="backendVersion">backend not connected</small></div></div>
+    <div class="backend-strip">
+      <label>Backend <select id="profileSelect"></select></label>
+      <input id="backendUrl" placeholder="http://localhost:8000" spellcheck="false">
+      <input id="backendToken" type="password" placeholder="Bearer token (remote only)">
+      <button id="saveProfileBtn" class="secondary">Save Profile</button>
+      <button id="testBackendBtn">Test Connection</button>
+      <span id="connectionBadge" class="badge offline">OFFLINE</span>
+    </div>
+    <button id="themeBtn" class="icon-btn" title="Toggle theme">◐</button>
+  </header>
+
+  <section class="backend-summary">
+    <div><span>Profile</span><strong id="profileName">—</strong></div>
+    <div><span>Hardware</span><strong id="hardwareSummary">—</strong></div>
+    <div><span>Primary model</span><strong id="primarySummary">—</strong></div>
+    <div><span>Small model</span><strong id="smallSummary">—</strong></div>
+    <div><span>Current run</span><strong id="runSummary">—</strong></div>
+  </section>
+  <details class="profile-options">
+    <summary>Backend Profile Details</summary>
+    <div class="profile-form">
+      <label>Description<input id="profileDescription" placeholder="Development backend"></label>
+      <label>Authentication<select id="profileAuth"><option value="none">None</option><option value="bearer">Bearer token</option></select></label>
+      <label>Model endpoint override<input id="profileModelOverride" placeholder="optional"></label>
+      <label>TLS policy<select id="profileTls"><option value="auto">Auto</option><option value="require_https">Require HTTPS</option><option value="allow_http">Allow HTTP</option></select></label>
+      <label class="inline-check"><input id="profileAutoConnect" type="checkbox"> Auto-connect</label>
+    </div>
+  </details>
+
+  <nav class="main-tabs" id="mainTabs">
+    <button data-tab="case" class="active">Case & Run</button>
+    <button data-tab="rca-config">RCA Configuration</button>
+    <button data-tab="models">Models & Inference</button>
+    <button data-tab="results">Results & Pipeline</button>
+    <button data-tab="history">History & Sessions</button>
+    <button data-tab="system">System</button>
+  </nav>
+
+  <main>
+    <section class="tab-page active" id="tab-case">
+      <div class="two-col case-grid">
+        <article class="panel grow">
+          <div class="panel-title"><div><h2>Case Input</h2><p>Complete ticket, steps/results, requirements, history, diagnostics and trace evidence.</p></div><span class="subtle">Backend owns all RCA decisions</span></div>
+          <textarea id="caseInput" class="case-editor" placeholder="Paste the complete current testcase here..."></textarea>
+          <div class="action-row wrap">
+            <button data-example="TEST-001" class="secondary exampleBtn">Load TEST-001</button>
+            <button data-example="TEST-002" class="secondary exampleBtn">Load TEST-002</button>
+            <button data-example="TEST-003" class="secondary exampleBtn">Load TEST-003</button>
+            <button id="clearBtn" class="secondary">New / Clear</button>
+            <span class="spacer"></span>
+            <button id="stopBtn" class="danger" disabled>Stop / Abort</button>
+            <button id="analyzeBtn" class="primary">Analyze Case</button>
+          </div>
+        </article>
+        <aside class="panel run-panel">
+          <h2>Batch / Test Bundle</h2>
+          <p>Sequential execution remains backend-controlled; no browser-side parallel RCA.</p>
+          <button id="runBuiltinBtn" class="wide">Run TEST-001 → TEST-003</button>
+          <label class="file-picker">Test Bundle ZIP<input id="bundleFile" type="file" accept=".zip"></label>
+          <button id="runBundleBtn" class="wide secondary">Upload & Run Test Bundle</button>
+          <hr>
+          <h3>Run State</h3>
+          <div class="run-state-card">
+            <span id="runStateBadge" class="badge neutral">IDLE</span>
+            <strong id="currentStage">Ready</strong>
+            <p id="progressDetail">No active run.</p>
+          </div>
+          <div class="action-row">
+            <button id="downloadReportBtn" class="secondary" disabled>Report .md</button>
+            <button id="downloadSessionBtn" class="secondary" disabled>Session .json</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="tab-page" id="tab-rca-config">
+      <div class="config-grid">
+        <article class="panel">
+          <h2>Primary RCA Model Behavior</h2>
+          <div class="form-grid">
+            <label>Primary temperature<input id="cfgPrimaryTemperature" type="number" min="0" max="2" step="0.05"></label>
+            <label>Primary reasoning<select id="cfgPrimaryReasoning"><option value="provider_default">Provider default</option><option value="low">Low</option><option value="medium">Medium</option><option value="xhigh">Extra High</option></select></label>
+            <label>Primary output tokens<input id="cfgPrimaryTokens" type="number" min="512" max="65536" step="512"></label>
+            <label>Request timeout (s)<input id="cfgTimeout" type="number" min="1" step="60"></label>
+          </div>
+        </article>
+        <article class="panel">
+          <h2>Multi-Model RCA Architecture</h2>
+          <div class="check-grid">
+            <label><input id="cfgFastIntake" type="checkbox"> 4B intake</label>
+            <label>Routing<select id="cfgFastIntakeMode"><option value="auto">Auto</option><option value="always">Always</option><option value="off">Off</option></select></label>
+            <label><input id="cfgSemanticPrep" type="checkbox"> 4B semantic preparation</label>
+            <label><input id="cfgSemanticArb" type="checkbox"> 27B semantic arbitration</label>
+            <label><input id="cfgRcaSynthesis" type="checkbox"> 27B RCA when justified</label>
+            <label><input id="cfgHypReview" type="checkbox"> 4B hypothesis review</label>
+            <label><input id="cfgFinalReview" type="checkbox"> 4B wording audit</label>
+          </div>
+          <div class="form-grid compact top-gap">
+            <label>Availability tokens<input id="cfgAvailabilityTokens" type="number"></label>
+            <label>Content tokens<input id="cfgContentTokens" type="number"></label>
+            <label>Semantic tokens<input id="cfgSemanticTokens" type="number"></label>
+            <label>Hypothesis tokens<input id="cfgHypTokens" type="number"></label>
+            <label>Review tokens<input id="cfgReviewTokens" type="number"></label>
+            <label>Final review reasoning<select id="cfgReviewReasoning"><option value="provider_default">Provider default</option><option value="low">Low</option><option value="medium">Medium</option></select></label>
+            <label>Final review thinking<select id="cfgReviewThinking"><option value="provider_default">Provider default / ON</option><option value="off">Off</option></select></label>
+            <label>Final review transport<select id="cfgReviewTransport"><option value="auto">Auto</option><option value="openai-chat">OpenAI chat</option><option value="qwen35-manual">Qwen3.5 manual</option></select></label>
+          </div>
+        </article>
+      </div>
+      <details class="panel legacy-panel">
+        <summary>Legacy / Compatibility Settings</summary>
+        <p>Preserved so older v0.x configuration and session data round-trip without loss. These are not active v0.8 topology knobs unless the backend compatibility path uses them.</p>
+        <div id="legacyConfigFields" class="form-grid compact"></div>
+      </details>
+      <div class="sticky-actions"><button id="reloadConfigBtn" class="secondary">Reload Configuration</button><button id="saveConfigBtn" class="primary">Save RCA Configuration</button><span id="configStatus" class="subtle"></span></div>
+    </section>
+
+    <section class="tab-page" id="tab-models">
+      <div class="config-grid">
+        <article class="panel">
+          <div class="panel-title"><h2>Primary Model</h2><button id="refreshModelsBtn" class="secondary">Refresh Models</button></div>
+          <div class="form-grid">
+            <label>Provider<select id="primaryProvider"><option>openai-compatible</option><option>lmstudio</option><option>llama.cpp</option><option>vllm</option></select></label>
+            <label>Endpoint<input id="primaryEndpoint"></label>
+            <label>Model<input id="primaryModel" list="primaryModelList"><datalist id="primaryModelList"></datalist></label>
+            <label>Context size<input id="primaryContext" type="number" min="0"></label>
+            <label>Thinking<select id="primaryThinking"><option value="provider_default">Provider default</option><option value="off">Off</option></select></label>
+            <label>Transport<select id="primaryTransport"><option value="auto">Auto</option><option value="openai-chat">OpenAI chat</option><option value="qwen35-manual">Qwen3.5 manual</option></select></label>
+            <label>Model API token env<input id="primaryTokenEnv" placeholder="LM_API_TOKEN"></label>
+          </div>
+          <button id="testPrimaryBtn" class="secondary">Test Primary Model</button>
+        </article>
+        <article class="panel">
+          <h2>Small / 4B Model</h2>
+          <div class="form-grid">
+            <label>Provider<select id="smallProvider"><option>openai-compatible</option><option>lmstudio</option><option>llama.cpp</option><option>vllm</option></select></label>
+            <label>Endpoint<input id="smallEndpoint"></label>
+            <label>Model<input id="smallModel" list="smallModelList"><datalist id="smallModelList"></datalist></label>
+            <label>Temperature<input id="smallTemperature" type="number" min="0" max="2" step="0.05"></label>
+            <label>Reasoning<select id="smallReasoning"><option value="provider_default">Provider default</option><option value="low">Low</option><option value="medium">Medium</option></select></label>
+            <label>Thinking<select id="smallThinking"><option value="off">Off</option><option value="provider_default">Provider default</option></select></label>
+            <label>Transport<select id="smallTransport"><option value="auto">Auto</option><option value="openai-chat">OpenAI chat</option><option value="qwen35-manual">Qwen3.5 manual</option></select></label>
+            <label>Context size<input id="smallContext" type="number" min="0"></label>
+            <label>Model API token env<input id="smallTokenEnv" placeholder="LM_API_TOKEN"></label>
+          </div>
+          <button id="testSmallBtn" class="secondary">Test Small Model</button>
+        </article>
+        <article class="panel span-two">
+          <div class="panel-title"><div><h2>Inference Engine</h2><p>Hardware/provider dependent. Capability discovery controls availability; these settings never change RCA semantics.</p></div><span id="capabilityHint" class="subtle"></span></div>
+          <div class="form-grid inference-grid">
+            <label data-cap="cpu_threads">CPU threads<input id="infCpuThreads" type="number" min="1"></label>
+            <label data-cap="gpu_offload">GPU layers<input id="infGpuLayers" type="number" min="0"></label>
+            <label data-cap="gpu_offload"><span><input id="infGpuOffload" type="checkbox"> GPU offload</span></label>
+            <label data-cap="tensor_split">Tensor split<input id="infTensorSplit" placeholder="e.g. 0.5,0.5"></label>
+            <label data-cap="flash_attention"><span><input id="infFlash" type="checkbox"> Flash Attention</span></label>
+            <label data-cap="batch_size">Physical batch size<input id="infBatch" type="number" min="1"></label>
+            <label data-cap="eval_batch_size">Eval batch size<input id="infEvalBatch" type="number" min="1"></label>
+            <label data-cap="parallel_inference">Parallel slots<input id="infParallel" type="number" min="1"></label>
+            <label data-cap="context_override">Context override<input id="infContext" type="number" min="1"></label>
+          </div>
+        </article>
+      </div>
+      <div class="sticky-actions"><button id="saveModelConfigBtn" class="primary">Save Model / Inference Configuration</button></div>
+    </section>
+
+    <section class="tab-page" id="tab-results">
+      <div class="result-layout">
+        <nav class="result-tabs" id="resultTabs">
+          <button data-result="report" class="active">Final Report</button><button data-result="pipeline">Live Pipeline</button><button data-result="logs">Stage Log</button><button data-result="batch">Sequential Batch</button><button data-result="validation">Validation</button><button data-result="canonical">Canonical Input</button><button data-result="json">Structured JSON</button><button data-result="stats">API Stats</button><button data-result="attempts">LLM Attempts</button><button data-result="repair">Repair Routing</button>
+        </nav>
+        <div class="result-content">
+          <div class="result-page active" id="result-report"><pre id="reportView" class="content-view markdown-view">No result loaded.</pre></div>
+          <div class="result-page" id="result-pipeline"><div class="pipeline-grid"><div id="stageList" class="stage-list"></div><div class="stage-detail"><div id="stageSummary" class="stage-summary">Select a stage.</div><div class="io-tabs"><button data-io="input" class="active">Stage Input</button><button data-io="output">Stage Output</button></div><pre id="stageInput" class="content-view io-page active"></pre><pre id="stageOutput" class="content-view io-page"></pre></div></div></div>
+          <div class="result-page" id="result-logs"><pre id="logsView" class="content-view"></pre></div>
+          <div class="result-page" id="result-batch"><pre id="batchView" class="content-view"></pre></div>
+          <div class="result-page" id="result-validation"><pre id="validationView" class="content-view"></pre></div>
+          <div class="result-page" id="result-canonical"><pre id="canonicalView" class="content-view"></pre></div>
+          <div class="result-page" id="result-json"><pre id="jsonView" class="content-view"></pre></div>
+          <div class="result-page" id="result-stats"><pre id="statsView" class="content-view"></pre></div>
+          <div class="result-page" id="result-attempts"><pre id="attemptsView" class="content-view"></pre></div>
+          <div class="result-page" id="result-repair"><pre id="repairView" class="content-view"></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-page" id="tab-history">
+      <div class="two-col">
+        <article class="panel"><div class="panel-title"><h2>Run History / Benchmarking</h2><button id="refreshHistoryBtn" class="secondary">Refresh</button></div><div id="runHistory" class="table-wrap"></div></article>
+        <article class="panel"><div class="panel-title"><h2>Sessions</h2><label class="file-picker small">Import Session<input id="sessionFile" type="file" accept=".json"></label></div><div id="sessionHistory" class="table-wrap"></div></article>
+      </div>
+      <article class="panel top-gap"><h3>Selected Session</h3><pre id="sessionView" class="content-view short"></pre></article>
+    </section>
+
+    <section class="tab-page" id="tab-system">
+      <div class="two-col">
+        <article class="panel"><h2>Backend Health & Infrastructure</h2><pre id="systemView" class="content-view short"></pre></article>
+        <article class="panel"><h2>Capabilities</h2><div id="capabilityCards" class="capability-cards"></div><pre id="capabilitiesRaw" class="content-view short"></pre></article>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

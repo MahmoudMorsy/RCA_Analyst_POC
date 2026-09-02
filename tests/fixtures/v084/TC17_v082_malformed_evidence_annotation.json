@@ -1,0 +1,26 @@
+{
+  "evidence_id": "EVID-REPORTED-002",
+  "resolution": {
+    "facts": [
+      {
+        "fact_id": "F-BAT",
+        "source_phrase": "BatteryVoltage remained 12.2 throughout the complete evaluated interval.",
+        "subject": "BatteryVoltage",
+        "operator": "EQ",
+        "value": "12.2",
+        "numeric_value": 12.2,
+        "temporal_semantics": "PERSISTENT_STATE",
+        "scope": {
+          "source_phrase": "throughout the complete evaluated interval",
+          "resolution": "RESOLVED",
+          "scope_id": "CASE_EVALUATED_INTERVAL"
+        },
+        "resolution": "VERIFIED",
+        "possible_roles": ["APPLICABILITY"],
+        "related_requirement_ids": ["REQ-1702"]
+      }
+    ],
+    "unresolved_semantics": []
+  },
+  "scope_id": ""
+}

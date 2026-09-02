@@ -1,0 +1,15 @@
+services:
+  rca-backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      RCA_DEPLOYMENT_PROFILE: /app/configs/deployment/local-dell.yaml
+      RCA_STORAGE_ROOT: /data
+      # For remote deployments set RCA_API_TOKEN and RCA_CORS_ORIGINS.
+      # Model endpoints can be injected without changing RCA code:
+      # RCA_PRIMARY_ENDPOINT: http://host.docker.internal:1234/v1
+      # RCA_SMALL_ENDPOINT: http://host.docker.internal:1234/v1
+    volumes:
+      - ./rca-data:/data
+    restart: unless-stopped
