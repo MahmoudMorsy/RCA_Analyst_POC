@@ -191,6 +191,15 @@ def evaluate_semantic_acceptance(result, expected_case: Optional[dict[str, Any]]
     def add(name: str, expected: Any, actual: Any, passed: bool) -> None:
         checks.append({"check": name, "expected": expected, "actual": actual, "pass": bool(passed)})
 
+    # Regression acceptance must not pass merely because an internal semantic
+    # compiler/integrity failure happened to collapse to the same conservative
+    # UNKNOWN/NOT-EVALUABLE verdict expected from genuinely missing evidence.
+    internal_errors = [
+        issue for issue in result.validated.issues
+        if getattr(issue.severity, "value", issue.severity) == "ERROR"
+    ]
+    add("semantic_integrity.internal_error_count", 0, len(internal_errors), not internal_errors)
+
     for key, exp in (expected_case.get("expected") or {}).items():
         if not str(key).upper().startswith("REQ-") or not isinstance(exp, dict):
             continue

@@ -40,6 +40,7 @@ from .models import (
     EvidenceAnnotationBatch,
     RequirementSemanticVerificationBatch,
     SemanticIntegrityIssue,
+    SemanticResolution,
     SemanticArbitrationResponse,
     RCARouteDecision,
     RCAEvidencePacket,
@@ -95,7 +96,7 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.6 adaptive semantic-compiler RCA architecture.
+    """v0.8.7 adaptive semantic-compiler RCA architecture.
 
     Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
@@ -451,13 +452,100 @@ class RCAPipeline:
                 "SEMANTIC_REQUIREMENT_COMPILER",
                 response,
             ))
-            compiled_batches.append(response.parsed)
             raw_parts.append(response.raw_json)
+
+            expected_ids = [x.requirement_id for x in batch]
+            expected_set = set(expected_ids)
+            first_rows = [x for x in response.parsed.requirement_irs if x.requirement_id in expected_set]
+            first_by_id = {}
+            duplicate_ids = set()
+            for row in first_rows:
+                if row.requirement_id in first_by_id:
+                    duplicate_ids.add(row.requirement_id)
+                first_by_id[row.requirement_id] = row
+            missing_ids = [rid for rid in expected_ids if rid not in first_by_id or rid in duplicate_ids]
+            recovery_response = None
+            if missing_ids:
+                missing_batch = [x for x in batch if x.requirement_id in set(missing_ids)]
+                recovery_prompt = self._semantic_requirement_batch_prompt(canonical, missing_batch, missing_recovery=True)
+                recovery_stage_id = f"{batch_stage_id}_recovery"
+                self._emit_trace(
+                    trace, recovery_stage_id, f"Requirement Compilation Recovery / Batch {batch_index}", "running",
+                    f"Previous compiler output omitted/duplicated {len(missing_ids)} authoritative requirement ID(s); recompiling only those IDs.",
+                    input_value={
+                        "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
+                        "requirement_ids": missing_ids,
+                        "request": json.loads(recovery_prompt),
+                    },
+                )
+                try:
+                    try:
+                        recovery_response = self.semantic_preparation_client.structured_repair(
+                            system_prompt=REQUIREMENT_COMPILATION_V086_PROMPT,
+                            user_prompt=recovery_prompt,
+                            response_model=RequirementCompilationBatch,
+                            schema_name="rca_requirement_compilation_recovery_v087",
+                        )
+                    except AttributeError:
+                        recovery_response = self.semantic_preparation_client.structured_chat(
+                            system_prompt=REQUIREMENT_COMPILATION_V086_PROMPT,
+                            user_prompt=recovery_prompt,
+                            response_model=RequirementCompilationBatch,
+                            schema_name="rca_requirement_compilation_recovery_v087",
+                        )
+                    stats.append(recovery_response.stats)
+                    attempts.append(self._make_aux_attempt(
+                        len(attempts) + 1,
+                        f"semantic_preparation_requirements_{batch_index}_missing_recovery",
+                        "SEMANTIC_REQUIREMENT_COMPILER_RECOVERY",
+                        recovery_response,
+                    ))
+                    raw_parts.append(recovery_response.raw_json)
+                    for row in recovery_response.parsed.requirement_irs:
+                        if row.requirement_id in set(missing_ids):
+                            first_by_id[row.requirement_id] = row
+                    still_missing = [rid for rid in expected_ids if rid not in first_by_id]
+                    self._emit_trace(
+                        trace, recovery_stage_id, f"Requirement Compilation Recovery / Batch {batch_index}",
+                        "attention" if still_missing else "complete",
+                        f"Recovery completed; {len(still_missing)} authoritative requirement ID(s) remain without IR.",
+                        output_value={
+                            "compiled": recovery_response.parsed,
+                            "still_missing_requirement_ids": still_missing,
+                            "model_call": recovery_response.stats,
+                            "finish_reason": recovery_response.finish_reason,
+                        },
+                    )
+                except ModelGatewayError as exc:
+                    stats.append(exc.stats)
+                    attempts.append(self._make_failed_attempt(
+                        len(attempts) + 1,
+                        f"semantic_preparation_requirements_{batch_index}_missing_recovery",
+                        "SEMANTIC_REQUIREMENT_COMPILER_RECOVERY",
+                        exc,
+                    ))
+                    self._emit_trace(
+                        trace, recovery_stage_id, f"Requirement Compilation Recovery / Batch {batch_index}", "attention",
+                        "Bounded missing-ID recovery failed; missing IRs remain explicit semantic integrity issues.",
+                        output_value={"error": str(exc)},
+                    )
+
+            merged_irs = [first_by_id[rid] for rid in expected_ids if rid in first_by_id]
+            merged_batch = RequirementCompilationBatch(
+                affected_functionality=response.parsed.affected_functionality,
+                requirement_irs=merged_irs,
+                unresolved_case_semantics=list(response.parsed.unresolved_case_semantics),
+            )
+            compiled_batches.append(merged_batch)
             self._emit_trace(
-                trace, batch_stage_id, f"Requirement Compilation / Batch {batch_index}", "complete",
-                f"Compiled {len(response.parsed.requirement_irs)} Requirement IR object(s).",
+                trace, batch_stage_id, f"Requirement Compilation / Batch {batch_index}",
+                "attention" if len(merged_irs) != len(expected_ids) else "complete",
+                f"Compiled {len(merged_irs)}/{len(expected_ids)} authoritative Requirement IR object(s).",
                 output_value={
-                    "compiled": response.parsed,
+                    "compiled": merged_batch,
+                    "expected_requirement_ids": expected_ids,
+                    "returned_requirement_ids": [x.requirement_id for x in merged_irs],
+                    "initial_duplicate_requirement_ids": sorted(duplicate_ids),
                     "model_call": response.stats,
                     "finish_reason": response.finish_reason,
                     "transport": response.transport,
@@ -469,19 +557,35 @@ class RCAPipeline:
         semantic_preparation = self._merge_semantic_preparation(compiled_batches, None)
         raw_llm_json = "\n\n".join(x for x in raw_parts if x)
 
-        # 06a: one bounded targeted structural-completion pass when the semantic
-        # compiler produced transport-valid but non-executable IR fields. Python
-        # identifies only exact structured target fields; the model returns compact
-        # patches rather than regenerating complete Requirement IR objects.
+        # 06a: up to two bounded targeted structural-completion passes. The
+        # first pass repairs executable shells and/or creates the complete
+        # source-clause audit. A second pass is allowed only when that newly
+        # explicit audit reveals another missing executable field (for example a
+        # timing clause that the original compiler omitted entirely). Python
+        # still identifies only structured target fields and never interprets
+        # requirement language itself.
         structural_issues = self.semantic_integrity_checker.structural_requirement_issues(semantic_preparation)
-        if structural_issues:
+        structural_pass_ran = False
+        for structural_pass in (1, 2):
+            if not structural_issues:
+                break
             targets = self._structural_completion_targets(semantic_preparation, structural_issues)
+            if not targets:
+                break
+            structural_pass_ran = True
             repair_ids = sorted(targets)
-            self._check_cancelled("semantic structural IR completion")
-            structural_prompt = self._semantic_structural_repair_prompt(canonical, semantic_preparation, structural_issues, targets)
+            self._check_cancelled(f"semantic structural IR completion pass {structural_pass}")
+            structural_prompt = self._semantic_structural_repair_prompt(
+                canonical, semantic_preparation, structural_issues, targets
+            )
+            stage_id = f"06a_structural_ir_completion_{structural_pass}"
+            stage_title = (
+                "Semantic Structural IR Completion" if structural_pass == 1
+                else "Semantic Structural IR Completion / Follow-up"
+            )
             self._emit_trace(
-                trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "running",
-                f"Completing exact non-executable IR fields for {len(repair_ids)} requirement(s) before semantic verification.",
+                trace, stage_id, stage_title, "running",
+                f"Completing exact executable/provenance IR fields for {len(repair_ids)} requirement(s) before semantic verification.",
                 input_value={
                     "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
                     "requirement_ids": repair_ids,
@@ -491,37 +595,42 @@ class RCAPipeline:
                 },
             )
             try:
-                # Structural completion should be compact even when the general
-                # semantic-preparation budget is large. The client-level thinking
-                # policy remains unchanged and is propagated by the transport.
-                completion_budget = min(int(getattr(self.semantic_preparation_client, "max_tokens", 3500) or 3500), 3500)
+                completion_budget = min(
+                    int(getattr(self.semantic_preparation_client, "max_tokens", 3500) or 3500), 3500
+                )
                 try:
-                    completion_client = self.semantic_preparation_client.clone(max_tokens=max(1200, completion_budget))
+                    completion_client = self.semantic_preparation_client.clone(
+                        max_tokens=max(1200, completion_budget)
+                    )
                 except AttributeError:
                     completion_client = self.semantic_preparation_client
                 structural_response = completion_client.structured_repair(
                     system_prompt=REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT,
                     user_prompt=structural_prompt,
                     response_model=RequirementStructuralPatchBatch,
-                    schema_name="rca_requirement_structural_patch_v086",
+                    schema_name=f"rca_requirement_structural_patch_v087_p{structural_pass}",
                 )
                 stats.append(structural_response.stats)
                 attempts.append(self._make_aux_attempt(
-                    len(attempts) + 1, "semantic_structural_completion",
-                    "SEMANTIC_STRUCTURAL_COMPLETION", structural_response
+                    len(attempts) + 1,
+                    f"semantic_structural_completion_{structural_pass}",
+                    "SEMANTIC_STRUCTURAL_COMPLETION",
+                    structural_response,
                 ))
                 self._validate_structural_patches(structural_response.parsed, targets)
                 semantic_preparation = self._apply_structural_patches(
                     semantic_preparation, structural_response.parsed, targets
                 )
-                remaining_structural = self.semantic_integrity_checker.structural_requirement_issues(semantic_preparation)
+                structural_issues = self.semantic_integrity_checker.structural_requirement_issues(
+                    semantic_preparation
+                )
                 self._emit_trace(
-                    trace, "06a_structural_ir_completion", "Semantic Structural IR Completion",
-                    "attention" if remaining_structural else "complete",
-                    f"Targeted structural completion finished; {len(remaining_structural)} transport-level defect(s) remain and will be handled conservatively by verification/arbitration.",
+                    trace, stage_id, stage_title,
+                    "attention" if structural_issues else "complete",
+                    f"Structural completion pass {structural_pass} finished; {len(structural_issues)} structured defect(s) remain.",
                     output_value={
                         "patches": structural_response.parsed,
-                        "remaining_issues": [x.model_dump(mode="json") for x in remaining_structural],
+                        "remaining_issues": [x.model_dump(mode="json") for x in structural_issues],
                         "model_call": structural_response.stats,
                         "finish_reason": structural_response.finish_reason,
                     },
@@ -530,18 +639,21 @@ class RCAPipeline:
                 if isinstance(exc, ModelGatewayError):
                     stats.append(exc.stats)
                     attempts.append(self._make_failed_attempt(
-                        len(attempts) + 1, "semantic_structural_completion",
-                        "SEMANTIC_STRUCTURAL_COMPLETION", exc
+                        len(attempts) + 1,
+                        f"semantic_structural_completion_{structural_pass}",
+                        "SEMANTIC_STRUCTURAL_COMPLETION",
+                        exc,
                     ))
                 self._emit_trace(
-                    trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "attention",
-                    "The bounded targeted structural completion did not yield an admissible patch; original partial IR is retained and the verifier/arbitration path remains authoritative.",
+                    trace, stage_id, stage_title, "attention",
+                    "The bounded targeted structural completion did not yield an admissible patch; current IR is retained and the verifier/arbitration path remains authoritative.",
                     output_value={"error": str(exc)},
                 )
-        else:
+                break
+        if not structural_pass_ran:
             self._emit_trace(
                 trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "skipped",
-                "No transport-level Requirement IR defect requires targeted completion.", output_value="Skipped."
+                "No structured Requirement IR defect requires targeted completion.", output_value="Skipped."
             )
 
         # 06b: independent evidence semantic annotation. This call is always
@@ -618,7 +730,7 @@ class RCAPipeline:
         # normalization is handled by the Pydantic model; remaining structured
         # defects such as RESOLVED persistent scope without scope_id receive one
         # targeted cheap 4B reannotation before any 27B arbitration.
-        evidence_structural_issues = self.semantic_integrity_checker.structural_evidence_issues(semantic_preparation)
+        evidence_structural_issues = self.semantic_integrity_checker.structural_evidence_issues(semantic_preparation, canonical)
         if evidence_structural_issues:
             repair_evidence_ids = sorted({x.evidence_id for x in evidence_structural_issues if x.evidence_id})
             self._check_cancelled("4B evidence semantic completion")
@@ -663,7 +775,7 @@ class RCAPipeline:
                 semantic_preparation = self._replace_evidence_annotations(
                     semantic_preparation, evidence_repair_response.parsed.evidence_annotations, repair_evidence_ids
                 )
-                remaining_evidence_structural = self.semantic_integrity_checker.structural_evidence_issues(semantic_preparation)
+                remaining_evidence_structural = self.semantic_integrity_checker.structural_evidence_issues(semantic_preparation, canonical)
                 self._emit_trace(
                     trace, "06c_evidence_completion", "Evidence Semantic Completion",
                     "attention" if remaining_evidence_structural else "complete",
@@ -766,7 +878,7 @@ class RCAPipeline:
             arbitrated_requirement_ids = sorted({x.requirement_id for x in material if x.requirement_id})
             self._check_cancelled("27B semantic arbitration")
             progress("Semantic arbitration", f"Resolving {len(material)} material semantic issue(s) in one primary-model call...")
-            arb_prompt = self._semantic_arbitration_user_prompt(raw_case, material)
+            arb_prompt = self._semantic_arbitration_user_prompt(canonical, material)
             self._emit_trace(trace, "08_semantic_arbitration", "27B Semantic Arbitration", "running",
                              "All material unresolved semantic issues are batched into one call using original source context; no candidate interpretation is presented as authority.",
                              input_value={"system_prompt": SEMANTIC_ARBITRATION_PROMPT, "user_prompt": arb_prompt})
@@ -899,7 +1011,7 @@ class RCAPipeline:
                 rca_synthesis = rca_response.parsed
                 raw_rca_synthesis_json = rca_response.raw_json
                 raw_llm_json = rca_response.raw_json
-                validated = self._merge_v080_rca(validated, canonical, rca_synthesis)
+                validated = self._merge_v080_rca(validated, canonical, semantic_preparation, rca_synthesis)
                 self._emit_trace(trace, "12_rca_synthesis", "27B RCA Synthesis", "complete",
                                  "RCA synthesis completed without a schema path capable of modifying requirement truth.", output_value=rca_synthesis)
             except ModelGatewayError as exc:
@@ -966,7 +1078,7 @@ class RCAPipeline:
             self._emit_trace(trace, "14_wording_review", "4B Wording Audit", "skipped", "Wording audit disabled or unavailable.", output_value="Skipped.")
 
         # 15-17: structural final gate + deterministic formatter.
-        final_issues = self._v080_final_consistency_issues(validated, canonical)
+        final_issues = self._v080_final_consistency_issues(validated, canonical, semantic_preparation)
         if final_issues:
             validated.issues.extend(final_issues)
             critical = [x for x in final_issues if x.severity == ValidationSeverity.ERROR]
@@ -978,9 +1090,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.6 analysis is ready for session export.",
+                         "Validated v0.8.7 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.6 analysis completed.")
+        progress("Complete", "v0.8.7 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1091,17 +1203,31 @@ class RCAPipeline:
         return batches
 
     @classmethod
-    def _semantic_requirement_batch_prompt(cls, canonical: CanonicalCase, batch: list) -> str:
+    def _semantic_requirement_batch_prompt(
+        cls, canonical: CanonicalCase, batch: list, *, missing_recovery: bool = False
+    ) -> str:
+        expected_ids = [x.requirement_id for x in batch]
+        instruction = (
+            "Compile exactly requirements_to_compile. reference_requirements are context only; "
+            "do not return IRs for them unless they are also in requirements_to_compile. "
+            "Return exactly one RequirementIR for every ID in expected_requirement_ids, no omissions and no duplicates."
+        )
+        if missing_recovery:
+            instruction += (
+                " This is a bounded recovery call because the previous compiler response omitted one or more authoritative IDs. "
+                "Return all and only the missing IDs listed here."
+            )
         payload = {
             "ticket_context": {
                 "ticket_id": canonical.ticket_id,
                 "title": canonical.title,
                 "description": canonical.description,
             },
+            "expected_requirement_ids": expected_ids,
             "requirements_to_compile": [cls._compact_requirement_reference(x) for x in batch],
             "reference_requirements": [cls._compact_requirement_reference(x) for x in canonical.requirements],
             "user_instructions": canonical.user_instructions,
-            "instruction": "Compile exactly requirements_to_compile. reference_requirements are context only; do not return IRs for them unless they are also in requirements_to_compile.",
+            "instruction": instruction,
         }
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
@@ -1121,22 +1247,30 @@ class RCAPipeline:
             ir = by_id.get(issue.requirement_id)
             if ir is None:
                 continue
-            field = ""
             sid = issue.semantic_id
+            description = issue.description
+            fields: set[str] = set()
+
+            # Provenance/audit defects are explicit structural targets.  The
+            # patch replaces the complete source-clause inventory; Python does
+            # not derive clause text or roles itself.
+            if "source-clause" in description or "source clause" in description or "compiler source-clause audit inventory" in description:
+                fields.add("source_clauses")
+
             if ir.required_behavior is not None and sid and ir.required_behavior.semantic_id == sid:
-                field = "required_behavior"
+                fields.add("required_behavior")
             elif ir.trigger is not None and sid and ir.trigger.semantic_id == sid:
-                field = "trigger"
+                fields.add("trigger")
             elif ir.timing is not None and sid and ir.timing.semantic_id == sid:
-                field = "timing"
+                fields.add("timing")
             elif ir.persistence is not None and sid and ir.persistence.semantic_id == sid:
-                field = "persistence"
+                fields.add("persistence")
             elif sid and cls._logic_contains_semantic_id(ir.condition, sid):
-                field = "condition"
+                fields.add("condition")
             else:
-                # Missing top-level objects can still be targeted from their
-                # explicit source-clause semantic IDs. This is structured linkage,
-                # not interpretation of the requirement prose.
+                # Missing top-level objects can be targeted from their explicit
+                # source-clause semantic IDs. This is structured linkage, not
+                # interpretation of the requirement prose.
                 clause = next((c for c in ir.source_clauses if c.semantic_id == sid), None)
                 role = clause.role.value if clause is not None else ""
                 field = {
@@ -1146,9 +1280,52 @@ class RCAPipeline:
                     "TIMING": "timing",
                     "PERSISTENCE": "persistence",
                 }.get(role, "")
-            if field:
-                targets.setdefault(ir.requirement_id, set()).add(field)
+                if field:
+                    fields.add(field)
+
+            # Missing semantic IDs on timing/persistence/trigger/behavior need
+            # the executable object repaired as well as the audit inventory.
+            lowered = description.casefold()
+            if "requirement timing" in lowered:
+                fields.add("timing")
+                fields.add("source_clauses")
+            if "requirement persistence" in lowered:
+                fields.add("persistence")
+                fields.add("source_clauses")
+            if "requirement trigger" in lowered:
+                fields.add("trigger")
+            if "required_behavior" in lowered or "required behavior" in lowered:
+                fields.add("required_behavior")
+
+            if fields:
+                targets.setdefault(ir.requirement_id, set()).update(fields)
         return {rid: sorted(fields) for rid, fields in targets.items()}
+
+    @staticmethod
+    def _compact_ir_for_structural_completion(ir) -> dict:
+        """Read-only compact IR used only to target model-authored completion."""
+        def logic(node):
+            if node is None:
+                return None
+            return {
+                "kind": node.kind.value,
+                "semantic_id": node.semantic_id,
+                "source_phrase": node.source_phrase,
+                "signal": node.signal,
+                "operator": node.operator.value,
+                "value": node.value,
+                "children": [logic(x) for x in node.children],
+            }
+        return {
+            "normative_type": ir.normative_type.value,
+            "condition": logic(ir.condition),
+            "trigger": ir.trigger.model_dump(mode="json") if ir.trigger else None,
+            "required_behavior": ir.required_behavior.model_dump(mode="json") if ir.required_behavior else None,
+            "timing": ir.timing.model_dump(mode="json") if ir.timing else None,
+            "persistence": ir.persistence.model_dump(mode="json") if ir.persistence else None,
+            "relationships": [x.model_dump(mode="json") for x in ir.relationships],
+            "source_clauses": [x.model_dump(mode="json") for x in ir.source_clauses],
+        }
 
     @classmethod
     def _semantic_structural_repair_prompt(cls, canonical: CanonicalCase, preparation: SemanticPreparation, issues, targets) -> str:
@@ -1163,7 +1340,15 @@ class RCAPipeline:
             field_context = {}
             for field in fields:
                 value = getattr(ir, field, None)
-                field_context[field] = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+                if hasattr(value, "model_dump"):
+                    field_context[field] = value.model_dump(mode="json")
+                elif isinstance(value, list):
+                    field_context[field] = [
+                        x.model_dump(mode="json") if hasattr(x, "model_dump") else x
+                        for x in value
+                    ]
+                else:
+                    field_context[field] = value
             semantic_ids = sorted({x.semantic_id for x in issues if x.requirement_id == rid and x.semantic_id})
             rows.append({
                 "requirement_id": rid,
@@ -1171,17 +1356,23 @@ class RCAPipeline:
                 "target_fields": fields,
                 "target_semantic_ids": semantic_ids,
                 "current_target_values": field_context,
+                "current_ir_read_only": cls._compact_ir_for_structural_completion(ir),
                 "defects": [x.description for x in issues if x.requirement_id == rid],
             })
         payload = {
             "requirements": rows,
-            "instruction": "Return compact patches for only target_fields. Do not regenerate or repeat already-valid IR fields.",
+            "instruction": (
+                "Return compact patches for only target_fields. Do not regenerate or repeat already-valid IR fields. "
+                "When source_clauses is targeted, return the COMPLETE source-clause audit inventory for every material "
+                "semantic element in current_ir_read_only and every explicit material clause in the original requirement. "
+                "The returned source_clauses list replaces the existing list; it is not appended."
+            ),
         }
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
     @staticmethod
     def _validate_structural_patches(batch: RequirementStructuralPatchBatch, targets: dict[str, list[str]]) -> None:
-        allowed_patch_fields = {"condition", "trigger", "required_behavior", "timing", "persistence"}
+        allowed_patch_fields = {"condition", "trigger", "required_behavior", "timing", "persistence", "source_clauses"}
         seen = set()
         for patch in batch.patches:
             if patch.requirement_id not in targets:
@@ -1486,53 +1677,119 @@ class RCAPipeline:
         return issues
 
     @staticmethod
-    def _semantic_arbitration_user_prompt(raw_case: str, issues) -> str:
+    def _semantic_arbitration_user_prompt(canonical: CanonicalCase, issues) -> str:
+        """Build a source-exact, issue-scoped arbitration packet.
+
+        v0.8.7 stops resending the entire raw case when material issues reference
+        a bounded set of requirements/evidence.  The selected excerpts remain
+        authoritative verbatim source fields; Python performs no semantic
+        compression or repair.
+        """
+        req_ids = {x.requirement_id for x in issues if x.requirement_id}
+        evidence_ids = {x.evidence_id for x in issues if x.evidence_id}
+        if not req_ids and not evidence_ids:
+            req_ids = {x.requirement_id for x in canonical.requirements}
+            evidence_ids = {x.id for x in canonical.evidence_inventory}
         payload = {
             "material_issues": [x.model_dump(mode="json") for x in issues],
-            "authoritative_original_case": raw_case,
-            "instruction": "Resolve all listed issues independently from the original source. Return only repaired objects for the referenced requirement/evidence IDs; keep genuinely ambiguous issue IDs unresolved.",
+            "authoritative_ticket_context": {
+                "ticket_id": canonical.ticket_id,
+                "title": canonical.title,
+                "description": canonical.description,
+            },
+            "authoritative_requirements": [
+                {
+                    "requirement_id": x.requirement_id,
+                    "requirement_text": x.raw_source_text or x.requirement_text,
+                }
+                for x in canonical.requirements if x.requirement_id in req_ids
+            ],
+            "authoritative_evidence": [
+                {
+                    "evidence_id": x.id,
+                    "evidence_class": x.evidence_class.value,
+                    "source": x.source,
+                    "text": x.raw_source_text or x.text,
+                    "anchor": x.anchor,
+                    "observation_type": x.observation_type.value,
+                    "signal_name": x.signal_name,
+                    "signal_value": x.signal_value,
+                    "transition_from": x.transition_from,
+                    "transition_to": x.transition_to,
+                }
+                for x in canonical.evidence_inventory if x.id in evidence_ids
+            ],
+            "user_instructions": list(canonical.user_instructions),
+            "instruction": (
+                "Resolve all listed issues independently from these exact authoritative source fields. "
+                "Return only complete repaired objects for the referenced requirement/evidence IDs; "
+                "keep genuinely ambiguous issue IDs unresolved."
+            ),
         }
-        return json.dumps(payload, indent=2, ensure_ascii=False)
+        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
     @staticmethod
     def _rca_v080_user_prompt(packet: RCAEvidencePacket) -> str:
         return "Perform RCA synthesis using only this verified RCA Evidence Packet.\n\n" + json.dumps(packet.model_dump(mode="json"), indent=2, ensure_ascii=False)
 
     @staticmethod
-    def _merge_v080_rca(validated: ValidatedAnalysis, canonical: CanonicalCase, synthesis: RCASynthesisReasoning) -> ValidatedAnalysis:
+    def _valid_rca_reference_ids(canonical: CanonicalCase, preparation: SemanticPreparation) -> set[str]:
+        """Return canonical evidence IDs plus VERIFIED semantic fact IDs.
+
+        The RCA packet exposes both ``evidence_id`` and ``fact_id``.  A hypothesis
+        may therefore cite either namespace, but a fact ID is admissible only
+        when it exists in a VERIFIED semantic annotation.
+        """
+        valid = {e.id for e in canonical.evidence_inventory}
+        valid.update(
+            fact.fact_id
+            for ann in preparation.evidence_annotations
+            for fact in ann.facts
+            if fact.resolution == SemanticResolution.VERIFIED and fact.fact_id
+        )
+        return valid
+
+    @classmethod
+    def _merge_v080_rca(
+        cls, validated: ValidatedAnalysis, canonical: CanonicalCase,
+        preparation: SemanticPreparation, synthesis: RCASynthesisReasoning
+    ) -> ValidatedAnalysis:
         out = copy.deepcopy(validated)
         evidence_ids = {e.id for e in canonical.evidence_inventory}
+        valid_refs = cls._valid_rca_reference_ids(canonical, preparation)
         clean_hypotheses = []
         for hyp in synthesis.hypotheses:
-            if not set(hyp.supporting_evidence_ids).issubset(evidence_ids):
+            if not set(hyp.supporting_evidence_ids).issubset(valid_refs):
                 continue
-            if not set(hyp.weakening_evidence_ids).issubset(evidence_ids):
+            if not set(hyp.weakening_evidence_ids).issubset(valid_refs):
                 continue
-            if not set(hyp.source_references).issubset(evidence_ids):
+            if not set(hyp.source_references).issubset(valid_refs):
                 continue
             clean_hypotheses.append(copy.deepcopy(hyp))
         out.semantic.affected_functionality = synthesis.affected_functionality or out.semantic.affected_functionality
         out.semantic.historical_tickets = copy.deepcopy(synthesis.historical_tickets)
-        out.semantic.diagnostic_evidence_ids = [x for x in synthesis.diagnostic_evidence_ids if x in evidence_ids]
+        out.semantic.diagnostic_evidence_ids = [x for x in synthesis.diagnostic_evidence_ids if x in valid_refs]
         out.semantic.hypotheses = clean_hypotheses
         out.semantic.case_validity_needs = copy.deepcopy(synthesis.case_validity_needs)
         out.hypotheses = copy.deepcopy(clean_hypotheses)
         out.case_validity_evidence = copy.deepcopy(synthesis.case_validity_needs)
         return out
 
-    @staticmethod
-    def _v080_final_consistency_issues(validated: ValidatedAnalysis, canonical: CanonicalCase):
+    @classmethod
+    def _v080_final_consistency_issues(
+        cls, validated: ValidatedAnalysis, canonical: CanonicalCase, preparation: SemanticPreparation
+    ):
         issues = []
         expected = [x.requirement_id for x in canonical.requirements]
         returned = [x.analysis.requirement_id for x in validated.requirement_results]
         if expected != returned:
             issues.append(ValidationIssue(code="V080_REQUIREMENT_ORDER_MISMATCH", severity=ValidationSeverity.ERROR, path="validated.requirement_results", message="Final requirement result IDs/order differ from authoritative canonical requirements."))
-        evidence_ids = {x.id for x in canonical.evidence_inventory}
+        valid_refs = cls._valid_rca_reference_ids(canonical, preparation)
         for idx, hyp in enumerate(validated.hypotheses):
             refs = set(hyp.supporting_evidence_ids) | set(hyp.weakening_evidence_ids) | set(hyp.source_references)
-            missing = sorted(refs - evidence_ids)
+            missing = sorted(refs - valid_refs)
             if missing:
-                issues.append(ValidationIssue(code="V080_HYPOTHESIS_UNKNOWN_EVIDENCE", severity=ValidationSeverity.ERROR, path=f"validated.hypotheses[{idx}]", message="Hypothesis references unknown evidence IDs: " + ", ".join(missing)))
+                issues.append(ValidationIssue(code="V080_HYPOTHESIS_UNKNOWN_EVIDENCE", severity=ValidationSeverity.ERROR, path=f"validated.hypotheses[{idx}]", message="Hypothesis references unknown canonical evidence/fact IDs: " + ", ".join(missing)))
         return issues
 
     def _run_v071_legacy(

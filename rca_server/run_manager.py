@@ -17,6 +17,7 @@ from rca_app.pipeline import PipelineValidationError
 from rca_app.test_bundle import (
     builtin_regression_expectations,
     evaluate_semantic_acceptance,
+    extract_case_id,
     load_expected_results_manifest,
     load_test_bundle_zip,
 )
@@ -60,6 +61,7 @@ class RuntimeRun:
     metrics: dict[str, Any] = field(default_factory=dict)
     result: Optional[dict[str, Any]] = None
     failure: Optional[dict[str, Any]] = None
+    case_lifecycle: list[dict[str, Any]] = field(default_factory=list)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
@@ -176,19 +178,49 @@ class RunManager:
             self._set_failed(runtime, str(exc))
 
     def _execute_single(self, runtime: RuntimeRun, raw_case: str) -> None:
+        case_id = extract_case_id(raw_case, runtime.summary.run_id)
+        started = _now()
+        runtime.case_lifecycle = [{
+            "case_id": case_id,
+            "execution_status": "RUNNING",
+            "semantic_acceptance": "NOT_EVALUATED",
+            "started_at": started,
+        }]
+        self._persist_case_lifecycle(runtime)
         pipeline = self.pipeline_factory.build(runtime.config, runtime.cancellation)
         runtime.pipeline = pipeline
-        result = pipeline.run(
-            raw_case,
-            progress=lambda stage, detail: self._progress(runtime, stage, detail),
-            trace=lambda event: self._trace(runtime, event),
-        )
-        runtime.pipeline = None
-        payload = result.model_dump(mode="json")
-        runtime.result = payload
-        self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", payload)
-        self.storage.write_text(f"runs/{runtime.summary.run_id}/report.md", result.final_report)
-        self._capture_model_metrics(runtime, payload)
+        case_started = time.perf_counter()
+        try:
+            result = pipeline.run(
+                raw_case,
+                progress=lambda stage, detail: self._progress(runtime, stage, detail),
+                trace=lambda event: self._trace(runtime, event),
+            )
+            payload = result.model_dump(mode="json")
+            runtime.result = payload
+            self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", payload)
+            self.storage.write_text(f"runs/{runtime.summary.run_id}/report.md", result.final_report)
+            self._capture_model_metrics(runtime, payload, case_id=case_id)
+            runtime.case_lifecycle[0].update({
+                "execution_status": "PASS",
+                "finished_at": _now(),
+                "result_available": True,
+                "statistics": self._case_statistics(
+                    runtime, case_id, round(time.perf_counter() - case_started, 6),
+                    {"result": payload},
+                ),
+            })
+            self._persist_case_lifecycle(runtime)
+        except Exception:
+            runtime.case_lifecycle[0].update({
+                "execution_status": "FAILED",
+                "finished_at": _now(),
+                "result_available": False,
+            })
+            self._persist_case_lifecycle(runtime)
+            raise
+        finally:
+            runtime.pipeline = None
 
     def _execute_builtin(self, runtime: RuntimeRun) -> None:
         root = Path(__file__).resolve().parent.parent
@@ -205,13 +237,32 @@ class RunManager:
         self._execute_case_sequence(runtime, cases, expectations)
 
     def _execute_case_sequence(self, runtime: RuntimeRun, cases: list[tuple[str, str]], expectations: dict[str, Any]) -> None:
-        records = []
+        records: list[dict[str, Any]] = []
         total = len(cases)
+        runtime.case_lifecycle = records
         runtime.result = {"run_type": runtime.request.run_type, "cases": records, "count": 0, "total_cases": total}
         self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+        self._persist_case_lifecycle(runtime)
+        completed_count = 0
         for index, (case_id, raw) in enumerate(cases, start=1):
             runtime.cancellation.throw_if_cancelled(f"before batch case {case_id}")
             case_started = time.perf_counter()
+            record: dict[str, Any] = {
+                "case_id": case_id,
+                "execution_status": "RUNNING",
+                "semantic_acceptance": "NOT_EVALUATED",
+                "started_at": _now(),
+                "result_available": False,
+            }
+            records.append(record)
+            runtime.result = {
+                "run_type": runtime.request.run_type,
+                "cases": records,
+                "count": completed_count,
+                "total_cases": total,
+            }
+            self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+            self._persist_case_lifecycle(runtime)
             self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: STARTED")
             pipeline = self.pipeline_factory.build(runtime.config, runtime.cancellation)
             runtime.pipeline = pipeline
@@ -228,23 +279,45 @@ class RunManager:
                 expected = expectations.get(case_id)
                 acceptance = evaluate_semantic_acceptance(result, expected) if expected else None
                 self._capture_model_metrics(runtime, payload, case_id=case_id)
-                record = {
-                    "case_id": case_id,
+                record.update({
                     "execution_status": "PASS",
-                    "semantic_acceptance": acceptance.model_dump(mode="json") if hasattr(acceptance, "model_dump") else acceptance,
+                    "semantic_acceptance": acceptance if isinstance(acceptance, dict) else (acceptance.model_dump(mode="json") if hasattr(acceptance, "model_dump") else acceptance),
                     "result": payload,
-                }
+                    "result_available": True,
+                })
             except PipelineValidationError as exc:
                 failure = self._failure_payload(str(exc), exc.validated, exc.canonical_case, exc.attempts, exc.stats, exc.repair_log)
                 self.storage.write_json(f"runs/{runtime.summary.run_id}/cases/{case_id}/failure.json", failure)
                 self._capture_model_metrics(runtime, failure, case_id=case_id)
-                record = {"case_id": case_id, "execution_status": "FAILED", "semantic_acceptance": "NOT_EVALUATED", "failure": failure}
+                record.update({
+                    "execution_status": "FAILED",
+                    "semantic_acceptance": "NOT_EVALUATED",
+                    "failure": failure,
+                    "result_available": True,
+                })
+            except AnalysisCancelled:
+                record.update({
+                    "execution_status": "CANCELLED",
+                    "semantic_acceptance": "NOT_EVALUATED",
+                    "result_available": False,
+                })
+                raise
             finally:
                 runtime.pipeline = None
-            record["statistics"] = self._case_statistics(runtime, case_id, round(time.perf_counter() - case_started, 6), record)
-            records.append(record)
-            runtime.result = {"run_type": runtime.request.run_type, "cases": records, "count": len(records), "total_cases": total}
-            self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+                if record["execution_status"] != "RUNNING":
+                    record["finished_at"] = _now()
+                    record["statistics"] = self._case_statistics(
+                        runtime, case_id, round(time.perf_counter() - case_started, 6), record
+                    )
+                    completed_count += 1
+                runtime.result = {
+                    "run_type": runtime.request.run_type,
+                    "cases": records,
+                    "count": completed_count,
+                    "total_cases": total,
+                }
+                self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+                self._persist_case_lifecycle(runtime)
             self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: {record['execution_status']}")
 
     def _case_statistics(self, runtime: RuntimeRun, case_id: str, elapsed_seconds: float, record: dict[str, Any]) -> dict[str, Any]:
@@ -319,6 +392,9 @@ class RunManager:
             return runtime.summary.model_copy(deep=True)
 
     def _finish_cancelled(self, runtime: RuntimeRun, message: str) -> None:
+        for row in runtime.case_lifecycle:
+            if row.get("execution_status") == "RUNNING":
+                row.update({"execution_status": "CANCELLED", "finished_at": _now(), "result_available": False})
         runtime.summary.status = RunState.CANCELLED
         runtime.summary.error = message
         runtime.summary.finished_at = _now()
@@ -329,6 +405,9 @@ class RunManager:
         self._auto_session(runtime)
 
     def _set_failed(self, runtime: RuntimeRun, message: str) -> None:
+        for row in runtime.case_lifecycle:
+            if row.get("execution_status") == "RUNNING":
+                row.update({"execution_status": "FAILED", "finished_at": _now(), "result_available": False})
         runtime.summary.status = RunState.FAILED
         runtime.summary.error = message
         runtime.summary.finished_at = _now()
@@ -549,8 +628,26 @@ class RunManager:
         runtime.summary.session_id = self.sessions.save(envelope)
         self._persist(runtime)
 
+    @staticmethod
+    def _case_lifecycle_snapshot(runtime: RuntimeRun) -> list[dict[str, Any]]:
+        keep = {
+            "case_id", "execution_status", "semantic_acceptance", "started_at",
+            "finished_at", "result_available", "statistics",
+        }
+        return [
+            {k: copy.deepcopy(v) for k, v in row.items() if k in keep}
+            for row in runtime.case_lifecycle
+        ]
+
+    def _persist_case_lifecycle(self, runtime: RuntimeRun) -> None:
+        self.storage.write_json(
+            f"runs/{runtime.summary.run_id}/case_lifecycle.json",
+            self._case_lifecycle_snapshot(runtime),
+        )
+
     def _persist(self, runtime: RuntimeRun) -> None:
         self.storage.write_json(f"runs/{runtime.summary.run_id}/metadata.json", runtime.summary.model_dump(mode="json"))
+        self._persist_case_lifecycle(runtime)
         self.storage.write_json(f"runs/{runtime.summary.run_id}/config_snapshot.json", runtime.config.model_dump(mode="json"))
         self.storage.write_json(f"runs/{runtime.summary.run_id}/pipeline.json", [x.model_dump(mode="json") for x in runtime.stages.values()])
 
@@ -605,15 +702,27 @@ class RunManager:
     def get_result(self, run_id: str) -> dict[str, Any]:
         try:
             runtime = self._require_runtime(run_id)
-            if runtime.result is not None: return {"status": runtime.summary.status.value, "result": runtime.result}
-            if runtime.failure is not None: return {"status": runtime.summary.status.value, "failure": runtime.failure}
+            wrapper = {
+                "status": runtime.summary.status.value,
+                "case_lifecycle": self._case_lifecycle_snapshot(runtime),
+            }
+            if runtime.result is not None:
+                wrapper["result"] = runtime.result
+            if runtime.failure is not None:
+                wrapper["failure"] = runtime.failure
+            return wrapper
         except KeyError:
             pass
+        lifecycle_path = self.storage.path(f"runs/{run_id}/case_lifecycle.json")
+        lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8")) if lifecycle_path.exists() else []
+        wrapper = {"status": self.get_summary(run_id).status.value, "case_lifecycle": lifecycle}
         result_path = self.storage.path(f"runs/{run_id}/result.json")
-        if result_path.exists(): return {"status": self.get_summary(run_id).status.value, "result": json.loads(result_path.read_text(encoding="utf-8"))}
+        if result_path.exists():
+            wrapper["result"] = json.loads(result_path.read_text(encoding="utf-8"))
         failure_path = self.storage.path(f"runs/{run_id}/failure.json")
-        if failure_path.exists(): return {"status": self.get_summary(run_id).status.value, "failure": json.loads(failure_path.read_text(encoding="utf-8"))}
-        return {"status": self.get_summary(run_id).status.value}
+        if failure_path.exists():
+            wrapper["failure"] = json.loads(failure_path.read_text(encoding="utf-8"))
+        return wrapper
 
     def get_events(self, run_id: str, after: int = 0) -> list[dict[str, Any]]:
         try:

@@ -167,7 +167,7 @@
           <div id="smallModelHint" class="model-hint subtle"></div><button id="testSmallBtn" class="secondary">Test Small Model</button>
         </article>
         <article class="panel span-two">
-          <div class="panel-title"><div><h2>Inference Engine</h2><p>Hardware/provider dependent. In v1.8.7 these fields describe/validate external model-server settings; the RCA backend does not restart or reconfigure llama.cpp/LM Studio/vLLM processes.</p></div><span id="capabilityHint" class="subtle"></span></div>
+          <div class="panel-title"><div><h2>Inference Engine</h2><p>Hardware/provider dependent. In v1.8.8 these fields describe/validate external model-server settings; the RCA backend does not restart or reconfigure llama.cpp/LM Studio/vLLM processes.</p></div><span id="capabilityHint" class="subtle"></span></div>
           <div class="form-grid inference-grid">
             <label data-cap="cpu_threads">CPU threads<input id="infCpuThreads" type="number" min="1"></label>
             <label data-cap="gpu_offload">GPU layers<input id="infGpuLayers" type="number" min="0"></label>
@@ -189,7 +189,7 @@
         <nav class="result-tabs" id="resultTabs">
           <button data-result="report" class="active">Final Report</button><button data-result="pipeline">Live Pipeline</button><button data-result="logs">Stage Log</button><button data-result="batch">Sequential Batch</button><button data-result="validation">Validation</button><button data-result="canonical">Canonical Input</button><button data-result="json">Structured JSON</button><button data-result="stats">API Stats</button><button data-result="attempts">LLM Attempts</button><button data-result="repair">Repair Routing</button>
         </nav>
-        <div id="batchCaseBar" class="batch-case-bar" hidden><label>Selected testcase <select id="batchCaseSelect"></select></label><span id="batchCaseStatus" class="subtle"></span></div>
+        <div id="batchCaseBar" class="batch-case-bar" hidden><label>Tests <select id="batchCaseSelect"></select></label><span id="batchCaseStatus" class="subtle"></span></div>
         <div class="result-content">
           <div class="result-page active" id="result-report"><pre id="reportView" class="content-view markdown-view">No result loaded.</pre></div>
           <div class="result-page" id="result-pipeline"><div class="pipeline-grid"><div id="stageList" class="stage-list"></div><div class="stage-detail"><div id="stageSummary" class="stage-summary">Select a stage.</div><div class="io-tabs"><button data-io="input" class="active">Stage Input</button><button data-io="output">Stage Output</button></div><div id="stageInput" class="content-view io-page structured-view active"></div><div id="stageOutput" class="content-view io-page structured-view"></div></div></div></div>

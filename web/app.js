@@ -70,7 +70,7 @@ function renderCapabilities(){
 function renderEnvironmentOverrides(){
   const overrides=state.capabilities?.environment_overrides||{},box=$('modelOverrideWarning');const rows=Object.entries(overrides);
   if(!rows.length){box.textContent='';box.hidden=true;box.classList.remove('show');return;}box.hidden=false;box.classList.add('show');
-  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.7 run-specific configuration overrides remain authoritative for the run you start.</span>`;
+  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.8 run-specific configuration overrides remain authoritative for the run you start.</span>`;
 }
 
 const configMap={
@@ -128,32 +128,52 @@ function startPolling(){if(state.pollTimer)clearInterval(state.pollTimer);state.
 function stopPolling(){if(state.pollTimer){clearInterval(state.pollTimer);state.pollTimer=null;}}
 async function refreshRun(){if(!state.activeRunId)return;const [summary,pipeline,logs,metrics,result]=await Promise.all([api(`/runs/${state.activeRunId}/status`),api(`/runs/${state.activeRunId}/pipeline`),api(`/runs/${state.activeRunId}/logs`),api(`/runs/${state.activeRunId}/metrics`).catch(()=>({})),api(`/runs/${state.activeRunId}/result`).catch(()=>({}))]);state.lastRun={summary,pipeline,logs,metrics,result};renderRun(summary,pipeline,logs,metrics,result);if(terminal.has(summary.status)){stopPolling();await refreshHistory();}}
 async function loadRun(id,resume=false){state.activeRunId=id;state.selectedCaseId=null;localStorage.setItem(`rca.activeRun.${state.profile.id}`,id);$('runSummary').textContent=id;await refreshRun();if(!terminal.has($('runStateBadge').textContent||''))startPolling();if(!resume)switchTab('results');}
-function batchCase(result){return (result?.cases||[]).find(x=>x.case_id===state.selectedCaseId)||null;}
-function updateBatchSelector(result){
-  const cases=result?.cases||[],bar=$('batchCaseBar'),sel=$('batchCaseSelect');if(!cases.length){bar.hidden=true;state.selectedCaseId=null;return;}bar.hidden=false;
-  const ids=cases.map(x=>x.case_id);if(!state.selectedCaseId||!ids.includes(state.selectedCaseId))state.selectedCaseId=ids.at(-1);const old=sel.value;sel.innerHTML='';cases.forEach(c=>{const o=document.createElement('option');o.value=c.case_id;o.textContent=c.case_id;sel.append(o)});sel.value=state.selectedCaseId||old;$('batchCaseStatus').textContent=`${cases.find(x=>x.case_id===sel.value)?.execution_status||''} · ${result.count||cases.length}/${result.total_cases||cases.length}`;
+function caseRows(resultWrap,summary){
+  const lifecycle=resultWrap?.case_lifecycle||[];
+  if(summary?.run_type==='single')return lifecycle;
+  return resultWrap?.result?.cases||lifecycle;
+}
+function selectedCaseRecord(resultWrap,summary){
+  const rows=caseRows(resultWrap,summary),row=rows.find(x=>x.case_id===state.selectedCaseId)||null;if(!row)return null;
+  if(summary?.run_type==='single'){
+    if(resultWrap?.result)return {...row,result:resultWrap.result,result_available:true};
+    if(resultWrap?.failure)return {...row,failure:resultWrap.failure,result_available:true};
+  }
+  return row;
+}
+function updateCaseSelector(rows,resultMeta){
+  const bar=$('batchCaseBar'),sel=$('batchCaseSelect');if(!rows.length){bar.hidden=true;state.selectedCaseId=null;return;}bar.hidden=false;
+  const ids=rows.map(x=>x.case_id);if(!state.selectedCaseId||!ids.includes(state.selectedCaseId)){const running=rows.find(x=>x.execution_status==='RUNNING');state.selectedCaseId=(running||rows.at(-1)).case_id;}
+  const old=sel.value;sel.innerHTML='';rows.forEach(c=>{const o=document.createElement('option');o.value=c.case_id;const sa=typeof c.semantic_acceptance==='string'?c.semantic_acceptance:(c.semantic_acceptance?.status||'');o.textContent=`${c.case_id} · ${c.execution_status||''}${sa&&sa!=='NOT_EVALUATED'?` · ${sa}`:''}`;sel.append(o)});sel.value=state.selectedCaseId||old;
+  const current=rows.find(x=>x.case_id===sel.value);const done=resultMeta?.count??rows.filter(x=>!['RUNNING','QUEUED'].includes(x.execution_status)).length,total=resultMeta?.total_cases??rows.length;$('batchCaseStatus').textContent=`${current?.execution_status||''} · ${done}/${total}`;
 }
 function renderBatchSummary(result){
   const cases=result?.cases||[],root=$('batchView');if(!cases.length){renderStructured(root,result,{empty:'No completed testcase results yet.'});return;}
   const wrap=document.createElement('div');const h=document.createElement('h3');h.textContent=`Batch progress: ${result.count||cases.length}/${result.total_cases||cases.length}`;wrap.append(h);const table=document.createElement('div');wrap.append(table);renderTable(table,['Case','Execution','Semantic acceptance','Elapsed','Model time','Calls','Tokens','Tok/s'],cases,c=>{const st=c.statistics||{},sa=c.semantic_acceptance;let accept=typeof sa==='string'?sa:(sa?.accepted===true?'PASS':sa?.accepted===false?'FAIL':sa?.status||'—');return[c.case_id,c.execution_status,accept,fmtSec(st.elapsed_seconds),fmtSec(st.model_seconds),st.model_calls??0,st.total_tokens??0,st.weighted_generation_tokens_per_second??'—'];},c=>{state.selectedCaseId=c.case_id;renderRun(state.lastRun.summary,state.lastRun.pipeline,state.lastRun.logs,state.lastRun.metrics,state.lastRun.result)});root.replaceChildren(wrap);
 }
 function fmtSec(v){if(v==null||Number.isNaN(Number(v)))return '—';const n=Number(v);if(n<60)return `${n.toFixed(2)} s`;return `${Math.floor(n/60)}m ${(n%60).toFixed(1)}s`;}
-function selectedCasePayload(result){const c=batchCase(result);if(!c)return null;return c.result||c.failure||null;}
+function selectedCasePayload(record){return record?.result||record?.failure||null;}
 function renderRun(s,pipeline,logs,metrics,resultWrap){
   $('runSummary').textContent=s.run_id;$('currentStage').textContent=s.current_stage||s.status;$('progressDetail').textContent=s.progress_detail||s.error||'';const badge=$('runStateBadge');badge.textContent=s.status;badge.className=`badge ${s.status.toLowerCase()}`;$('stopBtn').disabled=!['QUEUED','INITIALIZING','RUNNING','CANCELLING'].includes(s.status);$('downloadReportBtn').disabled=s.status!=='COMPLETED'||s.run_type!=='single';$('downloadSessionBtn').disabled=!s.session_id;
-  const result=resultWrap?.result,failure=resultWrap?.failure;const isBatch=s.run_type!=='single';if(isBatch&&result)updateBatchSelector(result);else{$('batchCaseBar').hidden=true;state.selectedCaseId=null;}
+  const result=resultWrap?.result,failure=resultWrap?.failure,isBatch=s.run_type!=='single',rows=caseRows(resultWrap,s);updateCaseSelector(rows,isBatch?result:null);
+  const selected=selectedCaseRecord(resultWrap,s);
   const filteredPipeline=isBatch&&state.selectedCaseId?(pipeline||[]).filter(x=>x.stage_id?.startsWith(`${state.selectedCaseId}:`)):(pipeline||[]);renderPipeline(filteredPipeline);
   const filteredLogs=isBatch&&state.selectedCaseId?(logs||[]).filter(x=>String(x.stage||'').startsWith(`${state.selectedCaseId} /`)||String(x.message||'').includes(state.selectedCaseId)):(logs||[]);$('logsView').textContent=filteredLogs.map(x=>`[${x.time}] [${x.stage}] ${x.message}`).join('\n');
-  if(isBatch&&result){renderBatchSummary(result);const c=batchCase(result),payload=selectedCasePayload(result);$('batchCaseStatus').textContent=`${c?.execution_status||''} · ${result.count||0}/${result.total_cases||0}`;renderCaseResultViews(c,payload,metrics,filteredPipeline);}
+  if(isBatch&&result){renderBatchSummary(result);renderCaseResultViews(selected,selectedCasePayload(selected),metrics,filteredPipeline);}
+  else if(rows.length){$('batchView').replaceChildren();renderCaseResultViews(selected,selectedCasePayload(selected),metrics,filteredPipeline);}
   else if(result){$('batchView').replaceChildren();renderSingleResultViews(result,metrics,filteredPipeline);}
   else if(failure){$('reportView').textContent=`FAILED\n\n${failure.message||''}`;renderStructured($('validationView'),failure.validated?.issues||failure);renderStructured($('canonicalView'),failure.canonical_case);renderStructured($('jsonView'),failure);renderStructured($('attemptsView'),failure.attempts||[]);renderStructured($('repairView'),failure.repair_log||[]);renderStats(metrics,null,filteredPipeline);}
   else {if(isBatch)renderBatchSummary(result||{cases:[]});renderStats(metrics,null,filteredPipeline);}
 }
 function renderSingleResultViews(result,metrics,pipeline){$('reportView').textContent=result.final_report||'No final report.';renderStructured($('validationView'),result.validated?.issues||[]);renderStructured($('canonicalView'),result.canonical_case);renderStructured($('jsonView'),result);renderStructured($('attemptsView'),result.attempts||[]);renderStructured($('repairView'),result.repair_log||[]);renderStats(metrics,null,pipeline);}
 function renderCaseResultViews(c,payload,metrics,pipeline){
-  if(!c){$('reportView').textContent='No completed testcase selected.';for(const id of ['validationView','canonicalView','jsonView','attemptsView','repairView'])renderStructured($(id),null);renderStats(metrics,null,pipeline);return;}
+  if(!c){$('reportView').textContent='No testcase selected.';for(const id of ['validationView','canonicalView','jsonView','attemptsView','repairView'])renderStructured($(id),null);renderStats(metrics,null,pipeline);return;}
   if(c.result){$('reportView').textContent=c.result.final_report||'No final report.';renderStructured($('validationView'),c.result.validated?.issues||[]);renderStructured($('canonicalView'),c.result.canonical_case);renderStructured($('jsonView'),c.result);renderStructured($('attemptsView'),c.result.attempts||[]);renderStructured($('repairView'),c.result.repair_log||[]);}
-  else {$('reportView').textContent=`FAILED\n\n${c.failure?.message||''}`;renderStructured($('validationView'),c.failure?.validated?.issues||c.failure);renderStructured($('canonicalView'),c.failure?.canonical_case);renderStructured($('jsonView'),c.failure);renderStructured($('attemptsView'),c.failure?.attempts||[]);renderStructured($('repairView'),c.failure?.repair_log||[]);}
+  else if(c.failure){$('reportView').textContent=`FAILED\n\n${c.failure?.message||''}`;renderStructured($('validationView'),c.failure?.validated?.issues||c.failure);renderStructured($('canonicalView'),c.failure?.canonical_case);renderStructured($('jsonView'),c.failure);renderStructured($('attemptsView'),c.failure?.attempts||[]);renderStructured($('repairView'),c.failure?.repair_log||[]);}
+  else {
+    $('reportView').textContent=`${c.case_id} is ${c.execution_status||'RUNNING'}. Final report is not available until testcase completion.`;
+    for(const id of ['validationView','canonicalView','jsonView','attemptsView','repairView'])renderStructured($(id),null,{empty:'Live testcase data is available in Pipeline, Logs and Stats until the result is finalized.'});
+  }
   renderStats(metrics,c.statistics||null,pipeline);
 }
 function renderStats(metrics,caseStats,pipeline){

@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.7  
-**Current RCA semantic-core baseline:** v0.8.6 candidate  
-**Validation status:** automated release gates are required and live TC17/TC12 validation remains pending. RCA Core v0.8.6 must not be declared frozen until those live reruns meet expected semantic targets.
+**Current application release:** v1.8.8  
+**Current RCA semantic-core baseline:** v0.8.7 candidate  
+**Validation status:** automated release gates are required. RCA Core v0.8.7 remains unfrozen until the exact v1.8.8 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors inside that rerun.
 
 ## 1. Product vision
 
@@ -19,13 +19,16 @@ The product shall:
 1. preserve original requirement/evidence source text and provenance;
 2. distinguish structural parsing from language semantics;
 3. compile free-form/mixed-language requirements into executable Requirement IR;
-4. annotate free-text evidence into structured semantic facts without Python NLP invention;
-5. independently verify semantic fidelity before deterministic execution;
-6. execute applicability, Boolean logic, state/transition/interval, timing and persistence deterministically in Python;
-7. remain conservative for missing/uncorrelated/unresolved evidence;
-8. use semantic arbitration only for material unresolved issues;
-9. route deep RCA only when actual mechanism-oriented evidence justifies it;
-10. produce auditable structured results, report, attempts, repair history, metrics and sessions.
+4. guarantee bounded compiler batch completeness against authoritative Requirement IDs;
+5. annotate free-text evidence into structured semantic facts without Python NLP invention;
+6. independently reconstruct and verify source semantics before deterministic execution;
+7. execute applicability, Boolean logic, state/transition/interval, timing and persistence deterministically in Python;
+8. remain conservative for missing/uncorrelated/unresolved evidence;
+9. make evidence materiality depend on authoritative structured relationships, not same-signal similarity alone;
+10. use semantic arbitration only for material unresolved issues rather than routine schema/provenance repair;
+11. route deep RCA only when positive mechanism-oriented evidence justifies it;
+12. accept only grounded canonical evidence or VERIFIED semantic facts as hypothesis provenance;
+13. produce auditable structured results, reports, attempts, repair history, metrics and sessions.
 
 ## 3. Application requirements
 
@@ -37,8 +40,10 @@ The Web application shall:
 - preserve cooperative Stop/Abort;
 - expose dynamic pipeline stages with persistent inputs/outputs;
 - render structured stage data human-readably while preserving Raw JSON;
+- expose testcase lifecycle from `RUNNING` through terminal status for both single and batch runs;
+- keep the current running testcase selectable even after the user browses a completed result;
 - provide full result parity for each testcase inside a batch;
-- expose per-case/per-stage/model-call statistics;
+- expose per-case/per-stage/model-call statistics, including failed calls;
 - keep model/provider logic behind ModelGateway;
 - support Dell/RunPod/Home through configuration, not forks;
 - preserve desktop fallback until Web/live parity is accepted.
@@ -58,7 +63,9 @@ Authoritative for what was written/measured; immutable provenance.
 Own language interpretation, Requirement IR compilation, evidence annotation, targeted semantic completion and independent semantic verification. Model capacity is configurable per role.
 
 ### Python
-Authoritative for structural executability, timestamps, Boolean IR execution, timing math, evidence scope/correlation, applicability/compliance verdicts, materiality and final consistency.
+Authoritative for structural executability, expected-ID batch completeness, timestamps, Boolean IR execution, timing math, evidence scope/correlation, materiality, applicability/compliance verdicts and final consistency.
+
+Python may normalize source formatting for provenance matching, but must not add automotive/natural-language semantic mappings.
 
 ### Primary/deep model
 May provide material semantic arbitration and RCA synthesis when routed. It cannot override Python compliance truth.
@@ -87,23 +94,27 @@ Preserve all established rules, including:
 - global coverage is not automatically signal-specific evidence;
 - NL “throughout” scope is non-executable until resolved with concrete scope;
 - raw source is never discarded;
-- transport-valid IR is not automatically executable IR.
+- transport-valid IR is not automatically executable IR;
+- same-signal overlap alone is insufficient evidence materiality.
 
-## 7. Current RCA Core v0.8.6 pipeline
+## 7. Current RCA Core v0.8.7 pipeline
 
 ```text
 RAW CASE
 → Python structural ingestion / intake routing
 → optional utility-model source/content sectioning
 → Python canonicalization
-→ Requirement IR compilation (Small / Utility OR Primary role)
-→ targeted structural semantic completion if needed
-→ Evidence Semantic Annotation (same selected preparation role)
+→ bounded Requirement IR compilation (Small / Utility OR Primary)
+→ Python expected-ID completeness check
+→ one missing-ID semantic recovery call if needed
+→ targeted structural semantic completion pass 1 if needed
+→ optional targeted structural completion pass 2 only if pass 1 exposes another missing top-level object
+→ Evidence Semantic Annotation
 → narrow schema-envelope canonicalization
 → targeted evidence completion if needed
-→ independent Requirement Semantic Verification (Small / Utility OR Primary role)
-→ Python semantic integrity/materiality + structured fingerprint comparison
-→ optional one Primary semantic arbitration
+→ independent Requirement Semantic Verification (Small / Utility OR Primary)
+→ Python structured fingerprint comparison + semantic integrity/materiality
+→ optional one issue-scoped Primary semantic arbitration
 → verified semantic representation
 → Python deterministic compliance engine
 → RCA router
@@ -113,47 +124,61 @@ RAW CASE
 → deterministic 11-section report
 ```
 
-## 8. v0.8.5 semantic hardening
+## 8. Semantic architecture evolution
 
-Live v1.8.5 Dell/RunPod evidence established that v0.8.4 could not be frozen:
+### v0.8.5
 
-- TC17 Boolean grouping was miscompiled while the same verifier returned `VERIFIED`;
-- arbitration could explain evidence in notes while returning non-executable structured facts;
-- Qwen3.5-4B repeatedly invented evidence schema enum values after context was increased beyond 8K.
+- capacity-neutral Critical Semantic Model Routing;
+- independent source-derived structured verifier fingerprint;
+- Python detection of TC17-style Boolean regrouping despite a `VERIFIED` model label;
+- rejection of notes-only/non-executable arbitration evidence repairs;
+- strict evidence enum contract without Python model-word mappings.
 
-v0.8.5 therefore:
+### v0.8.6
 
-- adds capacity-neutral Critical Semantic Model Routing;
-- requires an independent source-derived structured semantic fingerprint from the verifier and Python structural comparison;
-- rejects notes-only/non-executable arbitration evidence replacements;
-- tightens evidence prompt enums without Python phrase/operator mappings.
+- request-level Qwen/llama.cpp Thinking Off/On propagation;
+- reasoning-content observability;
+- targeted Requirement structural patches instead of full-IR regeneration;
+- bounded semantic-completion budgets;
+- executable persistent-scope completion;
+- stronger arbitration provenance attached directly to executable nodes.
 
-### v0.8.6 live-TC17 hardening
+### v0.8.7 full-suite hardening
 
-The v1.8.6 live TC17 run showed that stronger 27B semantics alone were insufficient: Thinking Off was not reaching llama.cpp, reasoning text was invisible in token telemetry, structural completion regenerated too much IR, persistent evidence scope remained non-executable, narrative ambiguity was over-materialized, and arbitration provenance was separated from executable nodes. v0.8.6 therefore adds request-level thinking control, targeted structural patches, reasoning-content observability, explicit persistent-scope completion, structured-dependency materiality and stricter executable-node provenance. Python evidence/compliance rules remain unchanged.
+The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic semantic-contract failures. v0.8.7 therefore adds:
 
-## 9. Current application architecture v1.8.7
+- expected Requirement-ID completeness validation and one bounded missing-ID recompilation;
+- complete source-clause audit inventory as a structural-completion target;
+- semantic-ID/source-clause linkage checks for condition, trigger, behavior, timing and persistence;
+- independent verifier normative-polarity reconstruction;
+- safe formatting-insensitive source grounding with explicit ordered ellipsis support;
+- authoritative structured materiality instead of same-signal/loose narrative materiality;
+- compact issue-scoped exact-source arbitration packets;
+- VERIFIED semantic fact IDs as valid RCA provenance;
+- semantic acceptance rejection when internal semantic-integrity ERRORs remain.
+
+None of these changes add Python natural-language meaning extraction or weaken evidence/compliance conservatism.
+
+## 9. Current application architecture v1.8.8
 
 ```text
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.6
+→ RCA Core v0.8.7
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.7 retains the v1.8.6 Web repairs and adds:
+v1.8.8 retains all v1.8.6/v1.8.7 Web/model improvements and adds authoritative testcase lifecycle:
 
-- request-level Qwen/llama.cpp Thinking Off/On propagation for critical semantic roles;
-- reasoning-content presence/character telemetry independent of provider reasoning-token accounting;
-- targeted Requirement IR structural patches instead of full-IR regeneration;
-- bounded targeted semantic-completion budgets;
-- persistent evidence scope completion and structured-dependency materiality;
-- arbitration provenance attached directly to executable repaired nodes.
-
-The v1.8.6 Stage Input persistence, readable structured I/O, batch testcase parity, incremental results, statistics, current-endpoint discovery/test, environment-override visibility, per-run snapshots and external-server authority UX remain required.
+- case enters the Tests list as `RUNNING` before pipeline execution;
+- the same lifecycle row updates to PASS/FAILED/CANCELLED;
+- single and batch runs use the same Tests selector concept;
+- live running case remains selectable after browsing finished cases;
+- live Pipeline/Logs/partial Stats remain available before final result;
+- final-only tabs explicitly show that the result is not yet available.
 
 ## 10. Configuration requirements
 
@@ -169,9 +194,9 @@ External model-server launch settings such as llama.cpp `-c`, GPU layers or Flas
 
 ## 11. Telemetry/benchmarking
 
-Capture per call: role/stage/model/provider/endpoint, prompt/completion/reasoning/total tokens, duration, finish reason, retries, transport and throughput.
+Capture per call: role/stage/model/provider/endpoint, prompt/completion/reasoning/total tokens, reasoning-content presence, duration, finish reason, retries, transport and throughput.
 
-Aggregate per testcase and stage. Failed calls must remain visible. Compare semantic acceptance separately from execution status.
+Aggregate per testcase and stage. Failed calls must remain visible. Compare semantic acceptance separately from execution status. Preserve lifecycle status for the currently running testcase.
 
 ## 12. Live validation targets
 
@@ -194,6 +219,8 @@ TC17 target remains:
 - REQ-1703 NOT APPLICABLE
 - no unsupported hypotheses.
 
+The next acceptance run should be the complete regression bundle with stable model settings, not testcase-specific code/config changes.
+
 ## 13. Release acceptance
 
 Every release must:
@@ -201,11 +228,11 @@ Every release must:
 1. increment versions intentionally;
 2. update README/CHANGELOG/VERSION_HISTORY;
 3. update semantic/application architecture docs when affected;
-4. include release notes;
+4. include release notes and synchronized handoff;
 5. pass full working-tree tests;
-6. pass compile/static checks;
+6. pass compile/static/JS/FastAPI smoke checks;
 7. build a clean ZIP;
-8. pass full tests from a fresh extraction;
-9. contain no caches/pyc/Git junk;
+8. pass full tests from a fresh extraction of that ZIP;
+9. contain no caches/pyc/Git/virtualenv junk;
 10. include required docs;
 11. record SHA-256.

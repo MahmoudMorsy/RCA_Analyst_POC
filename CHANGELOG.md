@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.8.8
+
+- Promote application to **v1.8.8** with embedded **RCA Core v0.8.7 candidate** after the complete 17-case RunPod suite exposed systemic semantic-contract defects beyond TC17.
+- Validate every Requirement Compilation batch against its authoritative expected IDs and perform one bounded semantic recovery call for missing IDs only; preserve source order and never create missing semantics in Python.
+- Make complete `source_clauses` provenance inventories first-class targeted structural-completion fields and allow at most two compact completion passes when provenance repair reveals another missing top-level semantic object.
+- Strengthen Requirement IR structural integrity for condition/trigger/behavior/timing/persistence semantic-ID and source-clause linkage.
+- Strengthen compiler/verifier contracts for executable behavior/trigger/timing/persistence and independent normative-polarity reconstruction, including prohibitive obligations.
+- Make exact-source grounding tolerant of bullet/line-break/punctuation layout and explicit source-order ellipsis while continuing to reject invented source text.
+- Remove same-signal/loose narrative linkage as a sufficient compliance-materiality path; require authoritative structured evidence dependencies.
+- Compact semantic arbitration to the exact authoritative requirements/evidence implicated by material issues, reducing prompt growth without weakening the strict replacement validator.
+- Accept VERIFIED semantic evidence fact IDs as RCA hypothesis provenance while rejecting unknown or unresolved fact IDs.
+- Make semantic acceptance fail whenever final semantic-integrity ERRORs remain, preventing an expected conservative verdict from passing through a broken semantic path.
+- Add authoritative testcase lifecycle persistence: single and batch cases appear as `RUNNING` before completion and update in place to terminal status.
+- Make the Web **Tests** selector universal for single/batch runs and keep the current running testcase selectable after browsing completed results.
+- Add v1.8.8 regressions for source grounding, narrative materiality, complete provenance repair, missing-ID recovery, normative-polarity/provenance prompt contracts, RCA fact-ID provenance, internal-error acceptance gating and live testcase lifecycle.
+- Release validation: **216 passed** in the working tree and **216 passed** from a clean fresh extraction.
+
 ## 1.8.7
 
 - Promote application to **v1.8.7** with embedded **RCA Core v0.8.6 candidate**; v0.8.6 remains unfrozen pending live TC17 then TC12 acceptance.

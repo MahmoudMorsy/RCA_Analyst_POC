@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.7 API
+# RCA Analyst v1.8.8 API
 
 Base path: `/api/v1`.
 
@@ -59,7 +59,7 @@ The response contains `models` and the provider `catalog` where available. llama
 }
 ```
 
-`config_override` is optional. v1.8.7 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
+`config_override` is optional. v1.8.8 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
 
 Run types:
 
@@ -72,6 +72,13 @@ Response returns quickly:
 ```json
 {"run_id":"...","status":"QUEUED"}
 ```
+
+
+### Testcase lifecycle — v1.8.8
+
+`GET /api/v1/runs/{run_id}/result` now includes top-level `case_lifecycle`. For batch runs, `result.cases` also contains the current RUNNING testcase before completion. A lifecycle record includes the testcase ID, execution status, semantic acceptance state, timestamps, result availability and partial/final statistics where available.
+
+Single runs expose one lifecycle row as soon as execution begins. Batch runs update the same row in place from `RUNNING` to `PASS`, `FAILED` or `CANCELLED`. Clients should use this authoritative lifecycle instead of assuming that only completed cases exist.
 
 ### Inspect
 

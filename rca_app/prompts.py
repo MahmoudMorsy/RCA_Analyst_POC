@@ -564,7 +564,7 @@ IMPORTANT BOUNDARIES
 
 
 REQUIREMENT_COMPILATION_V086_PROMPT = r"""
-You are the v0.8.6 Requirement Semantic Compiler for an automotive RCA pipeline.
+You are the v0.8.7 Requirement Semantic Compiler for an automotive RCA pipeline.
 Return only the requested RequirementCompilationBatch schema.
 
 You receive requirements_to_compile plus reference_requirements for context.
@@ -573,7 +573,7 @@ authoritative source. You do NOT decide compliance or root cause.
 
 For every requirement:
 - preserve requirement_id exactly;
-- provide faithful_meaning and normative_type;
+- provide faithful_meaning and normative_type; normative polarity is material: an obligation phrased as "shall not", "must not", "may not" or an equivalent explicit prohibition is PROHIBITIVE, while a positive "shall/must" obligation is MANDATORY. Do not label a clear prohibition MANDATORY;
 - compile every explicit IF/state condition into condition using recursive TRUE,
   PREDICATE, AND, OR, NOT nodes;
 - every PREDICATE must explicitly contain signal, operator, and value; comparison values are plain literals such as "9.5 V", never JSON objects serialized into the value string;
@@ -586,8 +586,8 @@ For every requirement:
 - compile remain/while/throughout/non-occurrence obligations into persistence with required=true and an explicit scope; for a "shall remain X" obligation governed by the requirement IF condition, use scope="WHILE_CONDITION" exactly. Do not invent persistence for a plain "shall be X" obligation that contains no persistence language;
 - compile only explicit relationships/inherited scope;
 - attach semantic_id and source_phrase to every material semantic element;
-- source_clauses must inventory every material source clause and map it to the
-  matching semantic_id in the executable IR;
+- source_clauses is MANDATORY whenever the requirement has any material semantic element. It must inventory every material source clause (condition, trigger, required behavior, timing, persistence, relationship/exception) and map each clause to the exact matching semantic_id in the executable IR. Never return source_clauses=[] for an executable requirement;
+- timing and persistence objects must each carry their own non-empty semantic_id and exact grounded source_phrase, and those IDs must also appear in source_clauses with roles TIMING/PERSISTENCE;
 - never silently drop language. Use unresolved_semantics or
   unmapped_source_spans when meaning is genuinely unresolved;
 - mixed German/English or unusual sentence order is not itself ambiguity;
@@ -604,7 +604,7 @@ not assign APPLICABLE/NOT APPLICABLE/SATISFIED/VIOLATED.
 
 
 REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT = r"""
-You are the v0.8.6 targeted Requirement IR structural completer.
+You are the v0.8.7 targeted Requirement IR structural completer.
 Return only the requested RequirementStructuralPatchBatch schema.
 
 Python has already identified exact structured fields that are transport-valid but
@@ -621,6 +621,8 @@ Rules:
 - explicit "X is not Y" should normally be one NEQ predicate with the exact negative source phrase;
 - persistence is returned only when the source explicitly requires remain/while/throughout/non-occurrence behavior, with required=true; for "shall remain X" under the requirement condition use scope="WHILE_CONDITION" exactly;
 - if a target cannot be completed faithfully, omit that target instead of inventing semantics. The normal verifier/arbitration path will keep it unresolved.
+- when source_clauses is a target, return the COMPLETE replacement source_clauses inventory for all material semantic elements of that requirement, including condition/trigger/required behavior/timing/persistence/relationship clauses already present in the read-only IR;
+- every source_clauses item must carry the same semantic_id as the executable element it audits;
 - keep output compact. Do not restate ticket context or already-valid IR fields.
 
 Do not calculate applicability, compliance, timing from evidence, hypotheses, or RCA.
@@ -628,7 +630,7 @@ Do not calculate applicability, compliance, timing from evidence, hypotheses, or
 
 
 EVIDENCE_ANNOTATION_V086_PROMPT = r"""
-You are the v0.8.6 Evidence Semantic Annotator for an automotive RCA pipeline.
+You are the v0.8.7 Evidence Semantic Annotator for an automotive RCA pipeline.
 Return only the requested EvidenceAnnotationBatch schema.
 
 Annotate only evidence_requiring_language_interpretation. Structured timestamped
@@ -647,7 +649,7 @@ Do NOT place facts inside the resolution field. Do NOT emit annotation-level
 scope_id. Scope belongs to each EvidenceSemanticFact.scope object.
 
 For every semantic fact:
-- evidence_id and source_phrase must remain grounded in the supplied evidence;
+- evidence_id and source_phrase must remain grounded in the supplied evidence; source_phrase should quote source wording rather than paraphrase it. Bullet punctuation/line breaks may be omitted, and an explicit "..." may mark omitted intervening source text, but do not insert words that are not present in the source;
 - operator MUST be exactly one of EQ, NEQ, LT, LTE, GT, GTE, PRESENT, ABSENT, OTHER. Never emit synonyms such as HAS, WAS, REACHES, CONTAINS, IS, BECOMES or NOT_APPLICABLE in the operator field;
 - fact resolution MUST be exactly VERIFIED, PARTIALLY_RESOLVED, or UNRESOLVED;
 - annotation resolution MUST be exactly VERIFIED, PARTIALLY_RESOLVED, or UNRESOLVED;
@@ -689,18 +691,17 @@ Return only the requested RequirementSemanticVerificationBatch schema.
 For every supplied requirement, first reconstruct the source semantics independently
 into independent_semantics, using only the ORIGINAL natural-language requirement.
 Only after that reconstruction, compare independent_semantics against COMPILED IR.
-Treat the compiled IR as untrusted and do not copy its Boolean grouping merely
-because it is present. Verify that it preserves all material meaning, including:
+Treat the compiled IR as untrusted and do not copy its Boolean grouping, normative type, or polarity merely because it is present. Reconstruct those independently from the original source. Verify that it preserves all material meaning, including:
 - IF/state conditions;
 - WHEN/UPON triggers;
 - nested AND/OR/NOT;
-- required behavior and prohibitions;
+- required behavior and prohibitions; a clear "shall not"/"must not"/equivalent negative obligation must reconstruct as normative_type=PROHIBITIVE, not MANDATORY;
 - timing limits;
 - persistence/non-occurrence semantics;
 - explicit exceptions;
 - explicit requirement relationships/inherited scope.
 
-Always populate independent_semantics, even when resolution is not VERIFIED.
+Always populate independent_semantics, even when resolution is not VERIFIED. Return exactly one verification item for every supplied authoritative requirement ID; never silently omit an item.
 Preserve nested Boolean grouping exactly in independent_semantics. In particular,
 A AND (B OR C) AND D is not equivalent to A AND (B AND (C OR D)). For explicit
 "X is not Y" / "X != Y", reconstruct a grounded NEQ predicate rather than a NOT
@@ -716,20 +717,18 @@ misrepresented. Do not calculate compliance and do not repair the IR.
 
 
 SEMANTIC_ARBITRATION_PROMPT = r"""
-You are the single case-level semantic arbitrator for v0.8.6.
+You are the single case-level semantic arbitrator for v0.8.7.
 Return only the requested SemanticArbitrationResponse schema.
 
 A fast semantic compiler has already run, but Python detected one or more
 MATERIAL semantic integrity problems that block deterministic compliance.
 Resolve ALL supplied arbitration questions in this ONE call.
 
-You are given the original authoritative case text and a list of structural
-problems. Interpret the original source independently. Do not assume the fast
+You are given exact authoritative source fields scoped to the listed material issues, plus the issue list. Interpret those original source fields independently. Do not assume the fast
 model's candidate interpretation is correct; candidate semantic objects are not
 provided as authority.
 
-Return only corrected Requirement IRs and/or evidence annotations for the
-requested requirement/evidence IDs. A Requirement IR returned by arbitration is
+Return only corrected Requirement IRs and/or evidence annotations for the requested requirement/evidence IDs. A Requirement IR returned by arbitration is
 a COMPLETE REPLACEMENT REPAIR, not another partial candidate:
 - encode every clear state condition into condition AST nodes;
 - every returned PREDICATE must explicitly populate semantic_id, exact grounded source_phrase, signal, operator, and value;

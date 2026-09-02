@@ -2,10 +2,25 @@
 
 ## Current version model
 
-- **Application version:** v1.8.7 — semantic transport/completion hardening release on the v1.8.6 Web/FastAPI baseline.
-- **Embedded RCA Core:** v0.8.6 candidate — live-TC17 semantic transport/completion, scope/materiality and provenance hardening.
-- **Validation:** automated release gates must pass; RCA Core v0.8.6 remains unfrozen until live TC17 then TC12 reruns meet their expected semantic targets.
+- **Application version:** v1.8.8 — full-suite semantic-contract and live testcase-lifecycle hardening release on the v1.8.7 baseline.
+- **Embedded RCA Core:** v0.8.7 candidate — full-suite compiler completeness, provenance, materiality, grounding, verification and RCA provenance hardening.
+- **Validation:** automated release gates must pass; RCA Core v0.8.7 remains unfrozen until the exact v1.8.8 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+
+## v1.8.7 → v1.8.8
+
+- Ran the complete 17-case RunPod regression after v1.8.7 fixed Qwen Thinking Off and reduced semantic-call runtime. All 17 cases executed, but only 2 met the old semantic-acceptance manifest; the suite exposed systemic defects beyond TC17.
+- Added authoritative expected-ID completeness checks to every Requirement Compilation batch and one bounded missing-ID semantic recovery call, fixing the TC20 class where entire requirements disappeared.
+- Expanded targeted structural completion to repair complete source-clause provenance inventories plus timing/persistence linkage, with at most two compact passes and no full-IR regeneration.
+- Strengthened compiler and independent-verifier contracts for executable trigger/behavior/timing/persistence fields and independent normative polarity; Python still does not interpret modality prose.
+- Relaxed only formatting-level source-grounding differences (bullets, line breaks, punctuation, explicit ordered ellipsis) while retaining hard failure for invented source content.
+- Corrected compliance materiality so narrative/same-signal overlap alone cannot block deterministic compliance; authoritative structured evidence dependencies remain conservative.
+- Scoped semantic arbitration to exact issue-related authoritative source fields to reduce repeated prompt bloat/truncation while keeping the replacement validator strict.
+- Fixed RCA hypothesis provenance so VERIFIED semantic fact IDs are valid references and unknown/unresolved fact IDs are not.
+- Strengthened semantic acceptance with an always-on final internal-ERROR check so TC4/TC11-style false-clean conservative verdicts cannot pass.
+- Added backend testcase lifecycle records before execution and a universal Web Tests selector so running single/batch cases remain visible and selectable.
+- Added nine v1.8.8 regressions covering these failure classes.
+- Release validation: **216 passed** in the working tree and **216 passed** from a clean fresh extraction.
 
 ## v1.8.6 → v1.8.7
 
@@ -136,7 +151,7 @@ This file is the chronological release-history log for the RCA Analyst POC. It c
 For v0.1, which predates the formal changelog, the entry is reconstructed from the repository README section **Why v0.2 exists**. All later entries come from the maintained changelog/release notes.
 
 **Earliest known release:** v0.1
-**Current release:** v1.8.7
+**Current release:** v1.8.8
 
 ## v0.1 — Earliest known baseline
 

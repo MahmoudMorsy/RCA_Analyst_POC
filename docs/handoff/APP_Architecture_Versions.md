@@ -1,114 +1,113 @@
-# APP Architecture Versions
+# RCA Analyst — Application Architecture Versions
 
-**Current application version:** v1.8.7  
-**Embedded RCA Core:** v0.8.6 candidate
+**Current application version:** v1.8.8  
+**Embedded RCA Core:** v0.8.7 candidate
 
 ## 1. Principles
 
-- browser is a backend client, not an RCA decision engine;
-- backend owns long-running jobs;
-- model providers stay behind ModelGateway;
-- deployment hardware is configuration;
-- sessions remain hardware-independent;
-- Web mode uses backend-mediated files/storage;
-- detailed developer controls remain available;
-- desktop remains fallback/reference until live Web parity is accepted.
+- one Web UI for Dell, RunPod and Home deployments;
+- fixed versioned FastAPI `/api/v1` backend boundary;
+- browser contains zero RCA decision logic;
+- backend owns long-run lifetime, cancellation, persistence and telemetry;
+- model/provider differences sit behind ModelGateway;
+- deployment differences are configuration, not code forks;
+- desktop application remains fallback/reference until live Web parity is accepted.
 
 ## 2. B0 — Monolithic desktop (v0.1 → v0.5.1)
 
-PySide UI, RCA pipeline, local files and LM Studio client shared one workstation process.
+PySide UI and RCA execution were colocated. Suitable for initial POC development but tightly coupled to local inference/runtime.
 
 ## 3. B1 — Regression/bundle workstation (v0.5.2 → v0.5.4)
 
-Sequential regression, ZIP bundles, persisted sessions/reports, execution-vs-semantic acceptance and forensic model attempts matured.
+Added sequential test bundles, session outputs and reproducible regression workflows.
 
 ## 4. B2 — Live observability/cancellation (v0.5.5 → v0.6.5)
 
-Desktop Live Pipeline, exact stage I/O, Stop/cancellation and rich multi-model controls became the functional parity reference.
+Added dynamic pipeline visibility, attempts/repair views, statistics and cooperative stop behavior.
 
 ## 5. B3 — Architecture-debugging desktop (v0.7.x → v0.8.4)
 
-Dynamic stage/chunk inspection and detailed session exports continued, but remote GPU deployment remained awkward because UI/execution/files were local-process coupled.
+Desktop remained primary while semantic architecture changed substantially. This exposed the need to decouple UI from model/runtime location.
 
 ## 6. B4 — v1.8.4/v1.8.5 Web/backend refactor
 
-```text
-Same Web UI
-→ FastAPI /api/v1
-→ backend Run Manager / Storage / Sessions / Telemetry
-→ RCA Core
-→ ModelGateway
-→ provider endpoint
-→ Dell / RunPod / Home
-```
+Introduced:
 
-v1.8.4 introduced backend-owned asynchronous runs, storage/session schema, provider abstraction, deployment profiles, bearer/CORS and Web UI. v1.8.5 fixed Python 3.9 FastAPI runtime annotations.
+- same static Web frontend;
+- FastAPI `/api/v1` backend;
+- backend-owned asynchronous Run Manager;
+- persistent Storage/Sessions/History/Telemetry;
+- ModelGateway/provider abstraction;
+- local Dell, RunPod and Home deployment profiles;
+- auth/CORS/remote deployment contracts;
+- desktop fallback.
 
-## 7. B5 — v1.8.6 observability/configuration/benchmarking repair
+v1.8.5 repaired Python 3.9 server-layer compatibility.
 
-Live Dell/RunPod use exposed Web migration defects that unit tests had not exercised sufficiently.
+## 7. B5 — v1.8.6 Web observability/configuration repair
 
-### 7.1 Persistent Stage I/O
-
-Repeated stage updates are merged; completion no longer erases input. Structured input/output is persisted and rendered human-readably with Raw JSON.
-
-### 7.2 Batch parity
-
-Batch case results are persisted incrementally. Selecting a testcase populates all forensic/result surfaces instead of leaving Validation, Canonical Input, LLM Attempts, Final Report, etc. empty.
-
-### 7.3 Statistics
-
-Per-case and per-stage aggregation includes elapsed/model time, tokens, retries, throughput, role/model/endpoint and requirement-result counts. Failed calls remain visible.
-
-### 7.4 Current-endpoint discovery/test
-
-`/models/discover` and `/models/test` accept current submitted role configuration so a user does not need to persist an endpoint before discovering/testing it.
-
-### 7.5 Deployment overrides and run snapshots
-
-Active `RCA_*` environment overrides are visible. Web runs carry explicit immutable `config_override` snapshots so deployment defaults do not silently prevent a controlled run.
-
-### 7.6 External model-server authority
-
-The backend does not claim that Web inference fields reconfigure an external llama.cpp/LM Studio/vLLM process. Context/offload settings are server-managed unless a future adapter declares ownership.
-
-### 7.7 Critical semantic model routing
-
-Application configuration adds a model-routing envelope selecting Small / Utility or Primary for semantic preparation and independent verification without endpoint hacks or process killing.
-
-## 8. Current API additions
-
-Existing `/api/v1` remains stable. v1.8.6 adds/extends:
-
-- `POST /models/discover` current-form endpoint discovery;
-- `POST /models/test` explicit submitted role config;
-- run `config_override`;
-- structured/persistent stage data;
-- incremental batch results;
-- richer case/stage metrics;
-- capabilities reporting active environment overrides.
-
-## 9. Deployment
-
-Dell, RunPod and Home remain one codebase. RunPod model ports should remain private. Real model context is established by the provider/server launch (`llama-server -c ...`), not by a browser value.
-
-## 10. Current validation status
-
-Automated application tests are release gates, but Web parity/RunPod readiness still require live-model/browser validation. TC17 then TC12 are the next semantic acceptance targets after v1.8.7 packaging; RCA Core v0.8.6 remains candidate until both pass.
+- merged repeated pipeline stage events so completed stages retain earlier input/output;
+- human-readable structured stage renderer plus Raw JSON;
+- per-testcase batch result tabs;
+- incremental completed-case publishing;
+- per-testcase/per-stage/failed-call statistics;
+- endpoint-current model discovery/test;
+- visible environment overrides;
+- immutable per-run configuration snapshots;
+- external model-server context/offload ownership represented accurately;
+- Critical Semantic Model Routing.
 
 ## 8. B6 — v1.8.7 semantic transport/observability hardening
 
-The Web/backend topology remains unchanged from v1.8.6. v1.8.7 repairs the boundary between configured semantic-role settings and actual OpenAI-compatible model requests:
+- explicit Qwen/llama.cpp request-level Thinking Off/On;
+- reasoning-content presence telemetry independent from provider reasoning-token count;
+- stable critical-role routing without endpoint hacks or killing model processes;
+- external model-server runtime context remains server-owned.
 
-- explicit Thinking Off/On is propagated to Qwen/llama.cpp through request-level chat-template kwargs;
-- reasoning-content presence and size are recorded even when provider token accounting reports zero reasoning tokens;
-- critical semantic routing remains configurable without endpoint hacks/process killing;
-- per-stage/per-role statistics expose requested thinking mode and reasoning-content activity;
-- the core uses targeted structural semantic patches so the application no longer spends full semantic budgets regenerating already-valid IR.
+## 9. B7 — v1.8.8 testcase lifecycle and full-suite integration
 
-External llama.cpp/LM Studio/vLLM context/offload/process lifecycle remains server-owned. v1.8.7 does not pretend a browser field can change a running server's `-c` value.
+The Tests selector is no longer derived only from completed result objects.
 
-## 9. Current API / deployment status
+Backend behavior:
 
-The stable `/api/v1` contracts from v1.8.6 remain. No browser RCA decision logic is added. Dell, RunPod and Home remain one codebase with configuration-only hardware differences.
+```text
+case created → RUNNING → PASS / FAILED / CANCELLED
+```
 
+- lifecycle row is persisted before pipeline execution;
+- single and batch runs both expose `case_lifecycle`;
+- batch `result.cases` includes the current RUNNING row;
+- the same row is updated in place at terminal state;
+- lifecycle snapshots contain slim status/timing/statistics metadata, not duplicated huge result payloads.
+
+Web behavior:
+
+- **Tests** selector appears for single and batch runs;
+- current running case appears immediately;
+- user can browse completed results and switch back to live case;
+- running case shows Live Pipeline, Logs and partial Stats;
+- final-only views report that final result is not yet available.
+
+This is presentation/lifecycle state only. The browser still does not infer RCA verdicts or semantic acceptance.
+
+## 10. Current backend/API contracts
+
+Key endpoints include:
+
+- `/api/v1/health`, `/system`, `/capabilities`;
+- `/api/v1/config`, `/models`, `/models/discover`;
+- `/api/v1/files`;
+- `/api/v1/runs` and run status/result/pipeline/logs/events/cancel/download;
+- `/api/v1/sessions`.
+
+`GET /runs/{run_id}/result` includes authoritative testcase lifecycle state during execution.
+
+## 11. Deployment
+
+The exact same v1.8.8 application package runs on Dell, RunPod and Home. Model endpoints/model IDs/context/offload are deployment configuration. External llama.cpp/LM Studio/vLLM process lifecycle remains external unless a future adapter explicitly owns it.
+
+## 12. Current validation status
+
+Automated application/core tests, compile/static checks, JS syntax, API smoke and clean-package replay are mandatory release gates. They do not replace live model/browser acceptance.
+
+Next: deploy the exact v1.8.8 package and rerun the complete live regression bundle with stable model settings. RCA Core v0.8.7 remains candidate.

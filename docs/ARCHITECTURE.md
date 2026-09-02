@@ -1,15 +1,15 @@
-# RCA Analyst v1.8.7 Application Architecture
+# RCA Analyst v1.8.8 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.7  
-**Embedded RCA Core:** v0.8.6 candidate
+**Application version:** v1.8.8  
+**Embedded RCA Core:** v0.8.7 candidate
 
-v1.8.7 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.6 observability/configuration repairs. It carries RCA Core v0.8.6, a live-TC17-driven semantic transport/completion hardening release: request-level Qwen thinking control, reasoning-content telemetry, targeted IR completion, executable persistence-scope routing, corrected materiality and stricter arbitration provenance.
+v1.8.8 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.6/v1.8.7 observability/provider repairs. It carries RCA Core v0.8.7, a full-suite semantic-contract hardening release: compiler completeness recovery, provenance-aware targeted completion, independent normative-polarity verification, safer source grounding, authoritative evidence materiality, issue-scoped arbitration and verified semantic-fact RCA provenance.
 
-RCA Core v0.8.6 is **not frozen** until live TC17/TC12 reruns pass. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.7 is **not frozen** until the exact v1.8.8 package passes a stable live full-suite rerun; TC17 and TC12 remain explicit anchors. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.6.md`](RCA_CORE_ARCHITECTURE_v0.8.6.md). Historical v0.8.4 architecture remains packaged separately.
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.7.md`](RCA_CORE_ARCHITECTURE_v0.8.7.md). Historical v0.8.4 architecture remains packaged separately.
 
 ## 2. Current topology
 
@@ -24,7 +24,7 @@ Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.6.md`](RCA_C
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager       RCA Core v0.8.6       Storage / Sessions
+ Async Run Manager       RCA Core v0.8.7       Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -99,7 +99,7 @@ Browser reload/disconnect does not cancel a run. Backend-process crash recovery 
 
 ## 6. Pipeline persistence and inspection
 
-v1.8.7 fixes the v1.8.5 stage-replacement bug. Repeated events for one stage are **merged**, so later completion/status events do not erase earlier Stage Input or Output.
+v1.8.6 fixed the v1.8.5 stage-replacement bug. Repeated events for one stage are **merged**, so later completion/status events do not erase earlier Stage Input or Output.
 
 Persisted stage data includes:
 
@@ -134,7 +134,7 @@ The Sequential Batch tab is an overall dashboard, not a substitute for per-case 
 
 The RCA core consumes the provider-neutral `ModelClient` protocol. `PipelineFactory` constructs clients through `ModelGateway`.
 
-v1.8.7 adds **Critical Semantic Model Routing**:
+v1.8.6 added **Critical Semantic Model Routing**:
 
 - semantic preparation (Requirement IR compilation + evidence annotation) can use `small` or `primary`;
 - independent semantic verification can separately use `small` or `primary`.
@@ -181,7 +181,7 @@ Primary and Small / Utility roles independently define:
 
 CPU threads, GPU layers/offload, tensor split, Flash Attention, batch sizes, slots, context override and provider options remain capability-gated metadata unless a deployment adapter explicitly owns the external model-server process.
 
-**Important:** v1.8.7 does not restart/reconfigure an externally launched llama.cpp/LM Studio/vLLM process. A server launched with `llama-server -c 8192` remains 8K regardless of a Web form value.
+**Important:** v1.8.8 does not restart/reconfigure an externally launched llama.cpp/LM Studio/vLLM process. A server launched with `llama-server -c 8192` remains 8K regardless of a Web form value.
 
 ## 10. Model discovery and environment overrides
 
@@ -269,3 +269,13 @@ Application defects must not be solved by weakening RCA semantics. Semantic chan
 ## 15. Python 3.9 compatibility
 
 The server layer continues to avoid runtime-evaluated PEP 604 annotations in FastAPI/Pydantic paths so the supported Dell Python 3.9 environment remains valid.
+## 16. v1.8.8 full-suite hardening
+
+v1.8.8 preserves the Web/FastAPI modular-monolith boundary and adds two coordinated contracts.
+
+**RCA Core v0.8.7:** compiler batches are completeness-checked with one bounded missing-ID recovery; provenance/source-clause inventories become structural-completion targets; independent verification reconstructs normative polarity; source grounding tolerates formatting-only differences and explicit source-order ellipsis; evidence materiality requires an authoritative structured dependency; arbitration receives an issue-scoped exact source packet; VERIFIED semantic fact IDs are accepted as RCA provenance. Python remains deterministic compliance authority.
+
+**Testcase lifecycle:** the Run Manager registers each testcase as RUNNING before pipeline execution and updates the same record to PASS/FAILED/CANCELLED. `/runs/{run_id}/result` therefore exposes the current case immediately for both single and batch runs. The Web Tests selector is a lifecycle selector, not merely a completed-results selector.
+
+A running testcase can be selected after browsing completed cases. Live Pipeline, Logs and partial Stats remain available; final-only views explicitly report that no final testcase result exists yet. The browser does not infer lifecycle state from pipeline labels.
+

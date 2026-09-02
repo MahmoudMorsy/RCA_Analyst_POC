@@ -87,7 +87,7 @@ def test_v187_live_tc17_compiler_output_targets_only_broken_fields():
     assert targets == {
         "REQ-1701": ["required_behavior"],
         "REQ-1702": ["required_behavior"],
-        "REQ-1703": ["persistence", "required_behavior"],
+        "REQ-1703": ["persistence", "required_behavior", "source_clauses"],
     }
     # The live compiler's correct nested condition must not be regenerated just
     # because its required_behavior transport shell was incomplete.

@@ -1,8 +1,8 @@
-# Local Dell Deployment — v1.8.7
+# Local Dell Deployment — v1.8.8
 
 ## Goal
 
-Run the same Web UI + FastAPI backend + RCA Core v0.8.6 locally with LM Studio/llama.cpp/OpenAI-compatible inference.
+Run the same Web UI + FastAPI backend + RCA Core v0.8.7 locally with LM Studio/llama.cpp/OpenAI-compatible inference.
 
 ## Setup
 
@@ -19,7 +19,7 @@ The default backend binds only to `127.0.0.1` and does not require an API token.
 
 ## Python compatibility
 
-The supported Dell runtime remains Python 3.9+. v1.8.7 retains the server-layer compatibility fix introduced in v1.8.5.
+The supported Dell runtime remains Python 3.9+. v1.8.8 retains the server-layer compatibility fix introduced in v1.8.5.
 
 ## Context and model-server settings
 

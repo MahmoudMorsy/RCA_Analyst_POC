@@ -733,6 +733,8 @@ class RequirementStructuralPatch(StrictModel):
     All fields are optional because Python supplies the exact target-field list in
     the request and rejects patches that modify untargeted fields. Python merges
     only these structured objects; it never derives their semantics from prose.
+    ``source_clauses`` is a complete replacement audit inventory when targeted;
+    it is not appended piecemeal, which keeps provenance deterministic.
     """
 
     requirement_id: str
@@ -741,6 +743,7 @@ class RequirementStructuralPatch(StrictModel):
     required_behavior: Optional[RequirementBehaviorIR] = None
     timing: Optional[RequirementTimingIR] = None
     persistence: Optional[RequirementPersistenceIR] = None
+    source_clauses: Optional[List[RequirementSemanticClause]] = None
 
 
 class RequirementStructuralPatchBatch(StrictModel):

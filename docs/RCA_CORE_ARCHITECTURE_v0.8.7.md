@@ -1,0 +1,224 @@
+# RCA Analyst POC RCA Core v0.8.7 Architecture
+
+**Status:** candidate; not frozen  
+**Carried by:** RCA Analyst application v1.8.8
+
+## 1. Governing authority
+
+> LLMs interpret human language into structured semantics. Python executes verified semantics deterministically. Model capacity and routing do not transfer compliance authority away from Python.
+
+Original source text remains immutable provenance. Python owns structural executability, timestamp mechanics, Boolean execution, state/transition/interval semantics, timing calculation, evidence bucketing, applicability/compliance verdicts and final consistency.
+
+No v0.8.7 fix introduces Python natural-language interpretation or weakens frozen evidence rules.
+
+## 2. Pipeline topology
+
+```text
+RAW CASE
+  ↓
+Python structural ingestion / intake routing
+  ↓
+optional Utility model free-form sectioning
+  ↓
+Python canonicalization
+  ↓
+Critical Semantic Preparation model
+  ├─ Requirement IR compilation in bounded batches
+  ├─ targeted RequirementStructuralPatch completion [conditional]
+  ├─ evidence semantic annotation
+  └─ targeted evidence completion [conditional]
+  ↓
+Independent Semantic Verification model
+  └─ source-derived structured semantic fingerprint
+  ↓
+Python semantic integrity + materiality
+  ↓
+optional one Primary semantic arbitration
+  ↓
+post-arbitration verification + Python integrity
+  ↓
+Verified Semantic Representation
+  ↓
+Python deterministic compliance
+  ↓
+RCA router
+  ↓
+optional one Primary RCA synthesis when mechanism evidence justifies it
+  ↓
+optional utility hypothesis/wording reviews
+  ↓
+Python final gate
+  ↓
+deterministic 11-section report
+```
+
+Critical semantic preparation and verification remain capacity-neutral roles: either may be routed to Small / Utility or Primary. The intended RunPod validation after v1.8.8 uses the stronger Primary 27B for both critical semantic roles while retaining utility tasks on the smaller model where appropriate.
+
+## 3. Transport thinking control
+
+Reasoning/thinking selection is a model-transport concern, not an RCA semantic rule.
+
+When Thinking Off is selected for an OpenAI-compatible Qwen/llama.cpp request, v1.8.8 sends request-level chat-template control equivalent to:
+
+```json
+{"chat_template_kwargs": {"enable_thinking": false}}
+```
+
+Thinking On sends `true`. Provider-default leaves the option unspecified. A bounded compatibility retry may remove the optional field only if the provider rejects it as unsupported.
+
+Reasoning text presence is observable independently from provider-reported reasoning token count.
+
+## 4. Requirement semantic compilation
+
+The compiler produces declarative Requirement IR. Every material source clause must be represented both in provenance and in executable fields.
+
+### 4.1 Conditions
+
+Conditions use a recursive Boolean AST:
+
+- TRUE;
+- PREDICATE;
+- AND;
+- OR;
+- NOT.
+
+Nested grouping must be preserved exactly. `A AND (B OR C) AND D` is not equivalent to `A AND [B AND (C OR D)]`.
+
+Simple source negatives such as `X is not Y` are represented as grounded `NEQ` predicates. NOT is reserved for negation where a compound expression is genuinely needed.
+
+### 4.2 Required behavior
+
+A signal/value obligation is executable only when the behavior contains:
+
+- semantic ID;
+- exact grounded source phrase;
+- signal;
+- executable operator;
+- value.
+
+Provenance-only shells are non-executable.
+
+### 4.3 Timing and persistence
+
+Exact timing limits are structured, then executed by Python from verified timestamps.
+
+Persistence exists only when explicitly supported by the source. It requires `required=true` and a concrete scope representation. A plain `shall be X` obligation does not gain invented persistence.
+
+## 5. Compiler batch completeness
+
+Every bounded Requirement Compilation request has an authoritative expected requirement-ID set. Python checks the returned IDs before accepting the batch. Missing IDs receive exactly one bounded semantic recompilation for the missing requirements only; recovered objects are merged in original source order.
+
+Unknown extra Requirement IRs are not promoted. Any ID still missing after recovery remains a material semantic-integrity failure. Python never reconstructs the missing requirement from natural language.
+
+## 6. Targeted structural completion
+
+v0.8.7 keeps targeted field patches and expands them to complete provenance/audit repair. Source-clause inventories, timing and persistence provenance are first-class completion targets.
+
+Python determines exact incomplete fields from structured IR/source-clause integrity. It sends only those targets to the semantic model. The response is `RequirementStructuralPatchBatch`.
+
+Python accepts a patch only when it:
+
+- identifies a known requirement;
+- changes only requested target fields;
+- does not duplicate a requirement patch;
+- contains an actual targeted repair.
+
+Already-valid IR is preserved byte-for-byte at the semantic field level. This prevents an incomplete behavior object from causing a correct Boolean condition to be regenerated and potentially corrupted.
+
+At most two compact completion passes are allowed. A second pass is permitted only when the first provenance repair reveals a wholly missing top-level semantic object. The completion call uses a compact bounded output budget because it is a repair, not a second full compilation.
+
+## 7. Evidence semantic annotation
+
+Language-derived evidence is annotated into structured facts. Raw structured timestamped trace facts remain read-only evidence context.
+
+Allowed operators remain bounded by schema. Unknown model words such as `HAS`, `REACHES`, `WAS`, or `CONTAINS` are not interpreted by Python.
+
+### 7.1 Temporal semantics
+
+STATE_SAMPLE, TRANSITION and PERSISTENT_STATE remain distinct. A point state proves only a point. Repeated point samples never become an interval automatically.
+
+For PERSISTENT_STATE to be executable:
+
+```text
+scope.resolution == RESOLVED
+AND
+scope.scope_id is concrete and non-empty
+```
+
+When the source explicitly resolves persistence to the complete evaluated case/test interval, semantic annotation may use `CASE_EVALUATED_INTERVAL`. An unresolved phrase such as `throughout the interval` remains unresolved when its referent is not supplied.
+
+## 8. Evidence materiality
+
+Materiality is determined from authoritative structured roles and dependencies, not prose similarity, same-signal overlap, or a loose requirement association alone.
+
+Narrative title/description/reported-result/history ambiguity is not automatically compliance-material. Direct observations explicitly linked to a requirement, explicit current-ticket scope metadata, and material evidence roles remain conservative when unresolved. Same-signal overlap alone never creates materiality.
+
+## 9. Independent semantic verification
+
+The verifier independently reconstructs source semantics into a structured fingerprint before comparing against candidate IR. Candidate compiler IR is untrusted input.
+
+Python compares the verifier fingerprint and compiler IR. A model label of `VERIFIED` cannot override a structural mismatch. The TC17 nested-Boolean regression remains protected.
+
+v0.8.7 additionally requires independent normative-polarity reconstruction. Positive obligations, prohibitions and permissions must be reconstructed from source rather than copied from candidate IR. This remains an LLM semantic contract; Python compares the structured result and does not classify natural-language modality itself.
+
+## 10. Semantic arbitration
+
+At most one material semantic arbitration call is allowed before deterministic compliance. v0.8.7 constructs an issue-scoped exact authoritative source packet so routine unrelated requirements/evidence do not inflate the arbitration prompt.
+
+Arbitration replacement objects must be executable and source-grounded. Every material executable element must itself carry the matching semantic ID and exact source phrase. A separate `source_clauses` list or explanatory notes cannot substitute for provenance on anonymous executable nodes.
+
+A notes-only repair, `OTHER` pseudo-fact, missing signal/value/scope, or malformed Boolean tree cannot clear a material integrity issue.
+
+## 11. Deterministic compliance
+
+Only verified executable semantics reach deterministic compliance. Python owns:
+
+- applicability;
+- condition evaluation;
+- Boolean logic;
+- transitions;
+- point/interval evidence mechanics;
+- timing math;
+- persistence evaluation;
+- relationship handling;
+- evidence bucket closure;
+- SATISFIED / VIOLATED / NOT EVALUABLE / NOT APPLICABLE outcomes.
+
+Missing executable evidence remains conservative rather than guessed.
+
+## 12. RCA routing
+
+A bare requirement violation or output symptom is insufficient to justify deep RCA. Primary RCA synthesis requires positive current-case mechanism evidence. Historical evidence remains supporting context only. Hypothesis provenance may reference either a canonical evidence ID or a VERIFIED semantic fact ID; unknown/unresolved fact IDs remain invalid.
+
+## 13. Frozen invariants
+
+v0.8.7 preserves all previously accepted invariants, including:
+
+- point state only proves point;
+- distinct samples are not simultaneous without correlation/aligned timestamp;
+- one opposite point cannot prove case-wide non-applicability;
+- persistence/scoped absence requires interval evidence or a verified resolved language scope;
+- state sample is not a transition;
+- applicability and evaluation evidence are separate;
+- missing evidence yields UNKNOWN / NOT EVALUABLE;
+- historical tickets are non-normative;
+- unsupported hypotheses are forbidden;
+- assignments remain assignments and transitions require ordered same-signal value change;
+- Python final truth;
+- no Python arbitrary-language NLP phrase lists;
+- simple IF state conditions are applicability, not event triggers;
+- arbitrary `throughout interval` prose is not executable without resolved scope;
+- transport-valid does not mean executable.
+
+## 14. Acceptance state
+
+RCA Core v0.8.7 is a **candidate**. Automated regressions are necessary but insufficient.
+
+Live acceptance sequence:
+
+1. Deploy the exact v1.8.8 package and rerun the complete regression bundle with a stable model configuration.
+2. TC17 must produce REQ-1701 APPLICABLE/VIOLATED, REQ-1702 NOT APPLICABLE, REQ-1703 NOT APPLICABLE, with no unsupported hypotheses.
+3. TC12 must meet its documented ten-requirement target, including deterministic REQ-1204 1100 ms vs 800 ms (+300 ms).
+4. Routine schema/provenance defects should no longer force arbitration in every case.
+
+Until those live targets pass, v0.4.3 TEST-003 and v0.5.2 TC1–TC3 remain the frozen semantic anchors.

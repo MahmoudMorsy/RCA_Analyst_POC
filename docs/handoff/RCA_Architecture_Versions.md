@@ -1,116 +1,127 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.7:** RCA Core v0.8.6 candidate.
+**Current RCA architecture carried by application v1.8.8:** RCA Core v0.8.7 candidate.
 
 ## 1. Persistent invariants
 
-Across all generations: preserve raw source/provenance; separate applicability/evaluation evidence; distinguish point/transition/interval; keep deterministic timing/math in Python; keep historical tickets non-normative; require positive mechanism support for hypotheses; keep repairs bounded/revalidated; later LLM stages cannot overwrite Python compliance truth.
+Original source is immutable provenance. LLMs interpret language into structured semantics. Python owns deterministic structural executability, evidence mechanics, timing, applicability/compliance and final consistency. Model capacity never transfers compliance authority away from Python.
 
 ## 2. A0 — Early monolithic reasoning (v0.1 → v0.3.6)
 
-27B performed broad semantic reasoning after basic parsing; Python validated/normalized. CanonicalCase, source boundaries, decomposition completeness, evidence buckets and auditable repair were progressively introduced. v0.3.6 remains an early TEST-001 checkpoint.
+Large-model case reasoning with progressively stronger deterministic parsing/validation. v0.3.6 TEST-001 remains an early validated checkpoint.
 
 ## 3. A1 — Explicit evidence semantics (v0.4.0 → v0.4.3)
 
-Introduced applicability evidence binding, `STATE_SAMPLE`/`TRANSITION`/`INTERVAL_STATE`, deterministic `TimingFact`, event coverage and strict point-vs-scope semantics.
-
-**Frozen:** v0.4.3 TEST-003, including deterministic 550 ms vs 500 ms violation.
+Introduced explicit state/transition/interval semantics and deterministic timing. v0.4.3 TEST-003 is frozen: 550 ms vs 500 ms VIOLATED, REQ-202 NOT APPLICABLE from INTERVAL_STATE evidence, no unsupported hypotheses.
 
 ## 4. A2 — Tiered repair/correlation/batch (v0.5.0 → v0.5.5)
 
-Deterministic → fast-model → primary repair routing; snapshot correlation; asymmetric conformance; batch execution; assignment-only transition safeguards; persisted attempt data; Live Pipeline.
-
-**Frozen:** v0.5.2 TC1–TC3.
+Added deterministic repair first, small-model targeted repair second, primary model only when necessary; strengthened evidence correlation and sequential batch validation. v0.5.2 TC1–TC3 are frozen anchors.
 
 ## 5. A3 — Multi-model intake/review (v0.6.0 → v0.6.5)
 
-Small model handled conditional intake/repair/review; Python retained final authority. Source availability became model-interpreted rather than Python phrase matching. Cooperative cancellation and structured review contracts matured.
+Introduced small-model intake/review and provider behavior controls. Thinking-heavy small-model review was rejected when it consumed output budget without usable structured output.
 
 ## 6. A4 — Mandatory decomposed Phase A/B (v0.7.0 → v0.7.1)
 
-Always-on decomposed 4B stages + mandatory 27B requirement reasoning and RCA synthesis. Live TC12 exposed high cost and interface-contract failures; this topology was retired.
+Explored decomposed primary-model architecture. Live TC12/TC17 showed unacceptable cost and semantic reliability, motivating v0.8.
 
 ## 7. A5 — Semantic compiler + deterministic compliance (v0.8.0 → v0.8.4)
 
-Requirement IR became the LLM→Python contract; independent verification, targeted structural/evidence completion, conditional one-call semantic arbitration and mechanism-gated RCA were introduced. v0.8.4 separated requirement/evidence semantic calls and hardened scope execution.
+Current governing architecture established:
 
-Live TC12/TC17 remained pending, so v0.8.4 was never frozen.
+- bounded Requirement IR compiler;
+- language evidence semantic annotation;
+- Python semantic integrity/materiality;
+- conditional semantic arbitration;
+- Python deterministic compliance;
+- RCA routing and conditional synthesis.
+
+v0.8.4 preserved split requirement/evidence calls and strict persistent-scope executability, but live Dell/RunPod validation showed it could not be frozen.
 
 ## 8. A6 — v0.8.5 semantic verification/routing hardening
 
-Live v1.8.5 Dell/RunPod sessions established three concrete defects:
-
-1. TC17 compiler repeatedly regrouped `A AND (B OR C) AND D` while the independent verifier returned `VERIFIED`.
-2. Arbitration could put correct meaning in notes but return compliance-linked facts with `OTHER`/missing executable fields and still claim resolution.
-3. Qwen3.5-4B evidence annotation repeatedly emitted invalid enum words even after RunPod context exceeded 8K.
-
-v0.8.5 adds:
-
-### 8.1 Critical Semantic Model Routing
-
-Semantic preparation and semantic verification independently select configured `small` or `primary` capacity. This changes transport/capacity only; Python remains compliance authority.
-
-### 8.2 Structured verifier fingerprint
-
-The verifier reconstructs source semantics independently into structured normative type, Boolean AST, trigger, behavior, timing, persistence and relationships. Python compares fingerprint to candidate IR. Commutative child order may normalize; Boolean regrouping cannot.
-
-A textual `VERIFIED` label is insufficient if structured semantics differ.
-
-### 8.3 Arbitration replacement hardening
-
-Compliance-linked replacement evidence cannot resolve a material issue if it is empty/unresolved, has missing subject/value, uses `operator=OTHER` for executable state meaning, remains `temporal_semantics=OTHER`, or claims persistence without resolved concrete scope.
-
-Notes do not substitute for executable fields.
-
-### 8.4 Evidence enum contract
-
-Evidence prompts enumerate legal schema values. Python does not translate invented words (`HAS`, `REACHES`, `WAS`, `CONTAINS`) into semantics.
+- Critical Semantic Model Routing allows semantic preparation and verification to use Small / Utility or Primary independently.
+- Independent verifier reconstructs source semantics into a structured fingerprint.
+- Python compares verifier fingerprint against compiler IR; a `VERIFIED` label cannot hide Boolean regrouping.
+- Notes-only/`OTHER` arbitration evidence pseudo-repairs are rejected.
+- Illegal evidence operators are not mapped by Python.
 
 ## 9. A7 — v0.8.6 live-TC17 transport/completion hardening
 
-The first v1.8.6 live TC17 run with Qwen3.8-27B for semantic preparation/verification and a 32K server context proved the model could reconstruct the central nested Boolean condition correctly, but exposed additional integration/contract defects:
+- explicit llama.cpp/Qwen Thinking Off/On propagation;
+- reasoning-content presence telemetry;
+- targeted RequirementStructuralPatch completion instead of full-IR regeneration;
+- bounded completion budgets;
+- explicit persistent-scope executability;
+- stricter executable-node arbitration provenance.
 
-1. Thinking Off did not reach llama.cpp and large `reasoning_content` consumed output budget while telemetry still reported zero reasoning tokens.
-2. Requirement behavior shells could carry provenance but omit executable signal/operator/value.
-3. Structural completion regenerated full IR and hit the 12K output limit twice instead of repairing only broken fields.
-4. Persistent language evidence could be correctly understood yet remain non-executable because scope resolution was missing.
-5. Narrative/title/reporting ambiguity was made material too broadly.
-6. Arbitration could understand the correct repair but separate source-clause IDs from anonymous executable nodes, causing strict validation rejection.
+This solved the dominant reasoning/token explosion and made a complete live regression practical.
 
-v0.8.6 adds:
+## 10. A8 — v0.8.7 full-suite semantic-contract hardening
 
-- request-level llama.cpp/Qwen thinking propagation and reasoning-content observability;
-- targeted `RequirementStructuralPatchBatch` completion protected against untargeted overwrite;
-- stronger required-behavior/negative-predicate/persistence executability contracts;
-- structural detection/completion of unresolved persistent scope;
-- materiality based on explicit roles and actual Requirement-IR structured dependencies;
-- stricter arbitration prompt provenance while retaining the existing Python validator.
+The complete v1.8.7 RunPod suite exposed additional systemic failures. v0.8.7 adds:
 
-No Python NLP heuristics or evidence-rule weakening are introduced.
+### 10.1 Compiler batch completeness
 
-## 10. Current topology
+Every batch has authoritative expected Requirement IDs. Missing IDs receive one bounded semantic recovery call for missing requirements only. Python never invents a missing Requirement IR.
+
+### 10.2 Provenance-aware targeted completion
+
+`source_clauses` is a first-class structural repair target. Condition predicates, trigger, required behavior, timing and persistence require semantic-ID/source-clause linkage. At most two compact completion passes are allowed; the second is only for a top-level semantic object exposed by pass-1 provenance repair.
+
+### 10.3 Independent normative polarity
+
+Verifier reconstructs normative type from source independently. Positive obligation, prohibition and permission semantics are model-semantic output, then compared structurally by Python. No modality phrase list is implemented in Python.
+
+### 10.4 Source grounding
+
+Grounding tolerates formatting-only bullet/line/punctuation differences. Explicit ellipsis can omit source text only when retained segments occur in source order. Invented words remain ungrounded.
+
+### 10.5 Evidence materiality
+
+Same-signal overlap and loose narrative requirement association alone are insufficient. Unresolved evidence blocks compliance only through authoritative structured dependencies/material roles. Direct evidence and explicit scope metadata remain conservative.
+
+### 10.6 Issue-scoped arbitration
+
+At most one Primary arbitration call remains. Its deterministic source packet contains exact authoritative requirement/evidence fields implicated by material issues, reducing unrelated prompt growth without weakening replacement validation.
+
+### 10.7 RCA provenance
+
+Final hypothesis validation accepts canonical evidence IDs and VERIFIED semantic fact IDs. Unknown/unresolved fact IDs are rejected.
+
+### 10.8 Regression acceptance
+
+A final semantic-integrity ERROR makes semantic acceptance FAIL even if conservative requirement verdicts happen to match an expected manifest.
+
+## 11. Current topology
 
 ```text
 RAW CASE
-→ Python structural ingestion/routing
-→ optional utility sectioning
-→ Python canonicalization
-→ semantic preparation role: Requirement IR compilation + targeted completion
-→ semantic preparation role: Evidence annotation + targeted completion
-→ semantic verification role: independent structured source fingerprint
-→ Python semantic integrity/materiality/fingerprint comparison
-→ optional ONE Primary semantic arbitration
+→ structural ingestion / intake routing
+→ canonicalization
+→ bounded Requirement compiler
+→ expected-ID completeness check + one missing-ID recovery [conditional]
+→ targeted structural completion pass 1 [conditional]
+→ targeted structural completion pass 2 [strictly conditional]
+→ evidence annotation + targeted evidence completion
+→ independent semantic verification
+→ Python fingerprint/integrity/materiality
+→ optional one issue-scoped Primary arbitration
 → verified semantics
 → Python deterministic compliance
 → RCA router
-→ optional ONE Primary RCA synthesis
+→ optional Primary RCA synthesis
 → optional utility reviews
-→ Python final consistency
-→ deterministic report
+→ Python final gate/report
 ```
 
-## 11. Validation status
+## 12. Frozen evidence rules
 
-RCA Core v0.8.6 is a **candidate**, not frozen. Live TC17 and TC12 must pass current expected targets before promotion.
+Do not weaken state/transition/interval distinctions, point-vs-scope semantics, correlation requirements, event coverage, persistence scope, applicability/evaluation separation, missing-evidence conservatism, historical non-normativity, hypothesis support requirements, raw assignment semantics, same-signal materiality prohibition, Python final authority or the prohibition on Python arbitrary-language NLP heuristics.
 
-Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3.
+## 13. Validation status
+
+RCA Core v0.8.7 is a **candidate**, not frozen.
+
+Deploy the exact v1.8.8 package and rerun the complete regression bundle with stable model settings. TC17 and TC12 remain explicit semantic anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
