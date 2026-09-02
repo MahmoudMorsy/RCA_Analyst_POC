@@ -67,9 +67,55 @@ class PipelineFactory:
         content_classification_client = make_small(legacy.fast_content_classification_max_tokens) if legacy.fast_intake_enabled else None
         atomic_claim_client = make_small(legacy.fast_atomic_claim_max_tokens) if legacy.fast_atomic_claim_enabled else None
         requirement_language_client = make_small(legacy.fast_requirement_language_max_tokens) if legacy.fast_requirement_language_enabled else None
-        semantic_preparation_client = make_small(legacy.semantic_preparation_max_tokens) if legacy.semantic_preparation_enabled else None
+        routing = config.model_routing
+
+        def make_semantic_role(role: str, max_tokens: int, *, reasoning_effort: str, thinking_mode: str):
+            selected = primary_cfg if role == "primary" else small_cfg
+            if not selected.model.strip():
+                return None
+            return self.gateway.create_client(
+                ModelClientSpec(
+                    role=f"semantic-{role}",
+                    provider=selected.provider,
+                    base_url=selected.endpoint,
+                    model=selected.model,
+                    temperature=0.0,
+                    reasoning_effort=reasoning_effort or selected.reasoning_effort,
+                    max_tokens=max_tokens,
+                    timeout_seconds=selected.timeout_seconds,
+                    api_token=self._token(selected.api_token_env),
+                    thinking_mode=thinking_mode or selected.thinking_mode,
+                    transport=selected.transport,
+                ),
+                cancellation_token=cancellation_token,
+            )
+
+        semantic_preparation_client = (
+            make_semantic_role(
+                routing.semantic_preparation_role,
+                legacy.semantic_preparation_max_tokens,
+                reasoning_effort=routing.semantic_preparation_reasoning_effort,
+                thinking_mode=routing.semantic_preparation_thinking_mode,
+            )
+            if legacy.semantic_preparation_enabled else None
+        )
+        # Backward-compatible fallback: an unconfigured selected role may fall
+        # back to the already-created Primary client, but an unreachable server
+        # is never silently treated as "not configured".
         if legacy.semantic_preparation_enabled and semantic_preparation_client is None:
             semantic_preparation_client = primary
+
+        semantic_verification_client = (
+            make_semantic_role(
+                routing.semantic_verification_role,
+                legacy.semantic_preparation_max_tokens,
+                reasoning_effort=routing.semantic_verification_reasoning_effort,
+                thinking_mode=routing.semantic_verification_thinking_mode,
+            )
+            if legacy.semantic_preparation_enabled else None
+        )
+        if legacy.semantic_preparation_enabled and semantic_verification_client is None:
+            semantic_verification_client = semantic_preparation_client
         repair_client = make_small(legacy.fast_repair_max_tokens) if legacy.fast_repair_enabled else None
         hypothesis_review_client = make_small(legacy.fast_hypothesis_review_max_tokens) if legacy.fast_hypothesis_review_enabled else None
         final_review_client = (
@@ -107,6 +153,7 @@ class PipelineFactory:
             primary_phase_a_chunk_size=legacy.primary_phase_a_chunk_size,
             semantic_preparation_client=semantic_preparation_client,
             semantic_preparation_enabled=legacy.semantic_preparation_enabled,
+            semantic_verification_client=semantic_verification_client,
             semantic_arbitration_client=primary,
             semantic_arbitration_enabled=legacy.semantic_arbitration_enabled,
             rca_synthesis_enabled=legacy.rca_synthesis_enabled,

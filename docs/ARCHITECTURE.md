@@ -1,14 +1,17 @@
-# RCA Analyst v1.8.5 Application Architecture
+# RCA Analyst v1.8.6 Application Architecture
 
-## 1. Scope and frozen semantic baseline
+## 1. Scope and semantic baseline
 
-v1.8.5 preserves the v1.8.4 **application architecture, deployment and UI boundaries**. It does not redesign the RCA reasoning architecture.
+**Application version:** v1.8.6  
+**Embedded RCA Core:** v0.8.5 candidate
 
-Authoritative RCA Core baseline: **v0.8.4**. The preserved semantic architecture is retained separately in [`RCA_CORE_ARCHITECTURE_v0.8.4.md`](RCA_CORE_ARCHITECTURE_v0.8.4.md).
+v1.8.6 keeps the v1.8.x Web/FastAPI modular-monolith architecture while repairing observability, batch-result parity, model discovery/configuration behavior and benchmarking. It also carries RCA Core v0.8.5, an evidence-driven semantic hardening release based on live Dell/RunPod TC12/TC17 failures.
 
-Application versioning intentionally jumps from **v0.8.4 → v1.8.4**, retaining the same minor/patch coordinates while marking the major application-architecture transition.
+RCA Core v0.8.5 is **not frozen** until live TC17/TC12 reruns pass. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-## 2. Target topology
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.5.md`](RCA_CORE_ARCHITECTURE_v0.8.5.md). Historical v0.8.4 architecture remains packaged separately.
+
+## 2. Current topology
 
 ```text
                          SAME WEB FRONTEND
@@ -16,12 +19,12 @@ Application versioning intentionally jumps from **v0.8.4 → v1.8.4**, retaining
                      REST / polling / SSE
                                 │
                                 ▼
-                    FIXED RCA BACKEND /api/v1
+                    FASTAPI RCA BACKEND /api/v1
                                 │
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager        RCA Core v0.8.4       Storage / Sessions
+ Async Run Manager       RCA Core v0.8.5       Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -33,76 +36,56 @@ Application versioning intentionally jumps from **v0.8.4 → v1.8.4**, retaining
              ┌──────────────────┼──────────────────┐
              ▼                  ▼                  ▼
          LOCAL DELL          RUNPOD           HOME AI SERVER
-       LM Studio/etc.       vLLM/etc.       LM Studio/vLLM/etc.
+       LM Studio/etc.    llama.cpp/vLLM/etc.  compatible provider
 ```
 
-The backend URL is the deployment abstraction. The frontend and RCA core are not forked by hardware target.
+Hardware location changes deployment configuration and endpoints, not RCA semantics or frontend code.
 
 ## 3. Frontend boundary
 
-`web/` is a dependency-light browser SPA using HTML/CSS/ES modules. It can be served by FastAPI or hosted separately.
+`web/` is a dependency-light browser SPA. It contains **zero RCA decision logic**.
 
-It contains no RCA decision logic. It may only:
+It may:
 
 - collect case/configuration input;
-- select backend profiles;
-- upload/download data;
+- manage backend profiles;
+- discover/test configured model endpoints;
 - start/cancel runs;
-- render run state, stages, logs, results and telemetry;
-- capability-gate unsupported inference-engine controls;
-- manage session/history presentation.
+- render backend-authoritative pipeline state, logs, results and telemetry;
+- render structured Stage Input/Output in a human-readable way while preserving Raw JSON;
+- select a testcase inside a sequential batch and render that case's complete result surfaces;
+- present per-case/per-stage statistics;
+- capability-gate settings that the backend/provider cannot actively control.
 
-It never decides applicability, compliance, repair, retry, evidence sufficiency, RCA routing, hypothesis validity or model-role execution.
-
-### Desktop parity
-
-The functional contract is [`DESKTOP_UI_MIGRATION_MATRIX.md`](DESKTOP_UI_MIGRATION_MATRIX.md). The Web UI preserves:
-
-- primary and small-model configuration;
-- intake/semantic/arbitration/RCA/review controls;
-- all legacy compatibility config fields;
-- case input and built-in tests;
-- sequential test-bundle execution;
-- Stop/Abort;
-- Final Report;
-- Live Pipeline + dynamic stages + input/output inspection;
-- Stage Log;
-- Sequential Batch;
-- Validation;
-- Canonical Input;
-- Structured JSON;
-- API Stats;
-- LLM Attempts;
-- Repair Routing;
-- report/session export;
-- run/session history.
+It never decides applicability, compliance, evidence sufficiency, repair, retry, arbitration, RCA routing or hypothesis validity.
 
 ## 4. Backend boundary
 
-`rca_server/` is a modular monolith built with FastAPI. It deliberately avoids Redis/Celery/database infrastructure at this POC stage.
+`rca_server/` remains a modular monolith built with FastAPI. Redis/Celery/database infrastructure is intentionally not introduced for the POC.
 
-Responsibilities:
+Responsibilities include:
 
 - versioned REST API;
 - authentication/CORS;
-- immutable per-run config snapshots;
-- background job lifecycle;
+- immutable per-run configuration snapshots;
+- background run lifetime;
 - cooperative cancellation;
 - persistent run journal;
-- live pipeline event capture;
+- dynamic pipeline event capture;
+- model discovery/test through provider-neutral endpoints;
+- per-case/per-stage telemetry aggregation;
 - file/session/report services;
-- capability discovery;
 - best-effort system telemetry;
 - ModelGateway construction;
 - deployment configuration.
 
-The API schemas are separate from `rca_app.models` domain objects.
+The API schemas remain separate from RCA core domain models.
 
-## 5. Long-running execution
+## 5. Long-running execution and reconnect
 
-`POST /api/v1/runs` writes `QUEUED` metadata and returns immediately. Execution occurs in a backend thread pool. Browser/request lifetime has no ownership of the job.
+`POST /api/v1/runs` returns a `run_id` quickly. Execution continues in the backend independently of browser lifetime.
 
-States are backend-authoritative:
+Backend-authoritative states:
 
 - `QUEUED`
 - `INITIALIZING`
@@ -112,110 +95,106 @@ States are backend-authoritative:
 - `COMPLETED`
 - `FAILED`
 
-Every transition is journaled. The browser can reload and recover state from `/runs` and `/runs/{id}`.
+Browser reload/disconnect does not cancel a run. Backend-process crash recovery preserves artifacts but does not claim semantic mid-stage resume.
 
-### Process restart
+## 6. Pipeline persistence and inspection
 
-v1.8.4 preserves incomplete run artifacts but does not attempt unsafe mid-pipeline resume after a backend process restart. Runs found in non-terminal state on startup are deterministically marked `FAILED` with an interruption message. Browser disconnect/reconnect is fully supported; backend-process crash recovery is artifact-preserving rather than semantic resume.
+v1.8.6 fixes the v1.8.5 stage-replacement bug. Repeated events for one stage are **merged**, so later completion/status events do not erase earlier Stage Input or Output.
 
-## 6. Cancellation
+Persisted stage data includes:
 
-Each run owns a `CancellationToken` and current pipeline reference. `POST /runs/{id}/cancel`:
+- stage ID/title/status/summary;
+- start/end/elapsed time;
+- text input/output;
+- structured `input_data` / `output_data` where available;
+- metadata;
+- per-stage model-call statistics.
 
-1. moves state to `CANCELLING`;
-2. sets the shared cancellation token;
-3. calls pipeline/model-client cancellation to close an active streaming request where possible;
-4. prevents additional pipeline progression/model calls;
-5. persists partial logs, stages and metrics;
-6. finalizes state as `CANCELLED`.
+The frontend renders structured data as nested labeled sections/tables and keeps Raw JSON available for forensic inspection.
 
-No partial RCA output is promoted to a completed result.
+## 7. Batch result architecture
 
-## 7. ModelGateway
+Batch runs publish results incrementally after each testcase, including failed cases. The aggregate run result is not delayed until the final testcase.
 
-The RCA core now consumes the provider-neutral `ModelClient` protocol. Deployment code creates clients through `ModelGateway`.
+A selected testcase drives:
 
-```text
-RCAPipeline
-   │ ModelClient protocol
-   ▼
-ModelGateway
-   ├─ OpenAI-compatible / LM Studio
-   ├─ llama.cpp-compatible
-   ├─ vLLM
-   └─ future providers
-```
+- Final Report;
+- Validation;
+- Canonical Input;
+- Structured JSON;
+- LLM Attempts;
+- Repair Routing;
+- logs;
+- pipeline;
+- statistics.
 
-The proven `LMStudioClient` transport remains as an OpenAI-compatible implementation behind the gateway. Core `pipeline.py` no longer imports it directly.
+The Sequential Batch tab is an overall dashboard, not a substitute for per-case result parity.
 
-The legacy Qt UI remains a frozen compatibility fallback and may still construct LM Studio clients directly; this does not define the v1 production architecture.
+## 8. ModelGateway and semantic-role routing
 
-## 8. Configuration separation
+The RCA core consumes the provider-neutral `ModelClient` protocol. `PipelineFactory` constructs clients through `ModelGateway`.
 
-### RCA configuration
+v1.8.6 adds **Critical Semantic Model Routing**:
 
-Hardware-independent behavior and model-role semantics. The backend retains the exact legacy `AppConfig` field names internally for migration safety.
+- semantic preparation (Requirement IR compilation + evidence annotation) can use `small` or `primary`;
+- independent semantic verification can separately use `small` or `primary`.
 
-### Model endpoint configuration
+This is a capacity/transport selection only. Python remains authoritative for deterministic compliance.
 
-Per role:
+Utility tasks may remain on the configured Small / Utility model while a stronger model is assigned to critical semantic roles.
+
+## 9. Configuration model
+
+### 9.1 RCA configuration
+
+Hardware-independent RCA behavior and legacy compatibility fields.
+
+### 9.2 Model-role configuration
+
+Primary and Small / Utility roles independently define:
 
 - provider;
 - endpoint;
 - model ID;
-- context size metadata;
 - temperature;
 - reasoning effort;
 - max output tokens;
+- expected context metadata;
+- timeout;
 - thinking mode;
 - transport;
-- timeout;
-- token environment-variable name.
+- API-token environment variable.
 
-Primary and small models remain independently configurable.
+### 9.3 Critical semantic routing
 
-### Inference-engine configuration
+`model_routing` contains:
 
-Hardware/provider dependent:
+- `semantic_preparation_role`: `small | primary`;
+- `semantic_verification_role`: `small | primary`;
+- independent reasoning/thinking overrides for those roles.
 
-- CPU threads;
-- GPU layers/offload;
-- tensor split;
-- Flash Attention;
-- physical/eval batch size;
-- parallel slots;
-- context override;
-- provider-specific options.
+### 9.4 Inference-engine configuration
 
-Capabilities determine whether a control is active. These settings never change RCA semantics.
+CPU threads, GPU layers/offload, tensor split, Flash Attention, batch sizes, slots, context override and provider options remain capability-gated metadata unless a deployment adapter explicitly owns the external model-server process.
 
-### Infrastructure configuration
+**Important:** v1.8.6 does not restart/reconfigure an externally launched llama.cpp/LM Studio/vLLM process. A server launched with `llama-server -c 8192` remains 8K regardless of a Web form value.
 
-Detected/reported:
+## 10. Model discovery and environment overrides
 
-- deployment type/profile;
-- hostname/OS/Python;
-- CPU/thread counts;
-- RAM;
-- GPU count/model/VRAM/utilization/temperature/power where available;
-- disk usage.
+`POST /api/v1/models/discover` discovers models from the endpoint currently entered in the form; saving first is not required.
 
-Telemetry absence never fails an RCA run.
+`POST /api/v1/models/test` can test explicit role configuration supplied in the request.
 
-## 9. Storage abstraction
+Deployment environment variables remain deployment defaults. Active `RCA_*` model overrides are surfaced to the frontend instead of silently making a save appear to revert.
 
-The browser never accesses backend filesystem paths directly.
+A run can carry an explicit `config_override` snapshot from the current form so a controlled run is reproducible and independent of later UI changes.
 
-`LocalStorageBackend` is the first storage implementation and works for:
+## 11. Storage and sessions
 
-- Dell local filesystem;
-- RunPod persistent mounted storage;
-- future home-server disks.
-
-Configurable root, no RunPod path in RCA core.
+Default local storage:
 
 ```text
-<root>/
+~/.rca_analyst_poc/web_backend/
   config/
   uploads/
   runs/<run_id>/
@@ -227,95 +206,62 @@ Configurable root, no RunPod path in RCA core.
     metrics.json
     result.json | failure.json
     report.md
-    cases/...                 # batch runs
+    cases/<case_id>/...
   sessions/
   reports/
   logs/
   tmp/
 ```
 
-## 10. Sessions
+RunPod typically uses `/workspace/rca-data` through `RCA_STORAGE_ROOT`.
 
-There remains one RCA session format across hardware targets.
-
-v1.8.4 introduces envelope schema version 2:
-
-```json
-{
-  "schema_version": 2,
-  "app_version": "1.8.4",
-  "session_id": "...",
-  "run_id": "...",
-  "status": "COMPLETED",
-  "deployment": {},
-  "hardware": {},
-  "inference_engine": {},
-  "config_snapshot": {},
-  "payload": {}
-}
-```
-
-Legacy desktop result/failure JSON without an envelope is deterministically wrapped. The complete original payload is retained in `original_legacy_payload`; migration never silently discards fields.
-
-## 11. Live Pipeline
-
-The validated RCA core already emits dynamic stage trace events. The backend timestamps and persists them as API `PipelineStage` objects:
-
-- stage ID/name;
-- status;
-- summary;
-- start/end time;
-- elapsed time;
-- exact stage input/output text;
-- metadata.
-
-The frontend renders stages dynamically and does not assume a fixed count. Both polling and SSE replay are available.
+There remains one hardware-independent session concept. Legacy desktop payloads are preserved during migration rather than silently discarded.
 
 ## 12. Metrics and benchmarking
 
-Run metrics include:
+Per model call, capture where available:
 
-- model/provider/role;
+- case ID;
+- role/stage;
+- provider/model/endpoint;
 - prompt/completion/reasoning/total tokens;
 - request duration;
-- derived generation tokens/s;
+- generation throughput;
 - finish reason;
+- retry count;
+- transport.
+
+Per testcase, aggregate:
+
+- elapsed time;
+- model time;
+- estimated non-model/Python time;
+- call counts;
+- tokens;
 - retries;
-- transport;
-- stage timing;
-- total run timing;
-- start/end hardware telemetry.
+- weighted throughput;
+- role breakdown;
+- requirement-result counts.
 
-Metrics unavailable from a provider (for example TTFT or model-load time) remain `null` rather than blocking analysis.
-
-Run history persists configuration/hardware/model metadata so TC12/TC17 can be compared across Dell, RunPod and future home hardware.
+Per stage, aggregate elapsed/model time, calls, tokens, retries, throughput and models/endpoints used. Failed calls contribute to statistics rather than disappearing from the benchmark.
 
 ## 13. Security
 
-Local profile may run unauthenticated on loopback.
+Local loopback may run without auth. Remote profiles support:
 
-Remote profiles support:
+- bearer token through `RCA_API_TOKEN`;
+- explicit CORS;
+- HTTPS/TLS at the RunPod/reverse-proxy edge;
+- private model endpoints wherever practical.
 
-- bearer token authentication (`RCA_API_TOKEN`);
-- explicit CORS (`RCA_CORS_ORIGINS`);
-- TLS/HTTPS at the platform/reverse-proxy edge;
-- private model endpoints behind the backend.
+Secrets are not committed in source.
 
-Secrets are not stored in source configuration. Model configs store environment-variable names, not token values. Browser backend bearer tokens are held in `sessionStorage`, not committed source/profile JSON.
+## 14. Desktop fallback and migration safety
 
-## 14. Docker/deployment
+The PySide desktop application remains packaged through `run_desktop.py` / `run_desktop.bat` as a fallback/reference until Web/live parity is explicitly accepted.
 
-The backend and frontend are one portable container in v1.8.4. Model servers remain separate provider services/endpoints because model-runtime choices differ greatly by hardware.
+Application defects must not be solved by weakening RCA semantics. Semantic changes require real failure evidence and regression coverage.
 
-`docker compose up --build` starts the RCA application. Deployment profiles and environment variables select storage/model endpoints without code changes.
+## 15. Python 3.9 compatibility
 
-## 15. Migration safety
-
-The desktop app is retained through `run_desktop.py` / `run_desktop.bat` until live parity is proven.
-
-RCA semantic changes are prohibited as part of this refactor. Any future migration-induced RCA change requires explicit documentation and the existing TC regression suite.
-
-
-## v1.8.5 Python 3.9 compatibility
-
-The backend avoids PEP 604 `T | None` annotations in FastAPI runtime signatures and server-layer callable annotations. This keeps the Web/backend application compatible with the existing Python 3.9 Dell environment without changing RCA semantics.
+The server layer continues to avoid runtime-evaluated PEP 604 annotations in FastAPI/Pydantic paths so the supported Dell Python 3.9 environment remains valid.

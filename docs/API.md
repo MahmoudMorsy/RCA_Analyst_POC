@@ -1,23 +1,45 @@
-# RCA Analyst v1.8.5 API
+# RCA Analyst v1.8.6 API
 
-Base path: `/api/v1`
-
-Interactive OpenAPI docs are available at `/docs` when the backend is running.
+Base path: `/api/v1`.
 
 ## Backend/system
 
-- `GET /health` — backend/version/profile health
-- `GET /system` — best-effort infrastructure telemetry
-- `GET /capabilities` — hardware/provider capability discovery
-- `GET /models` — configured primary/small model availability and model lists
-- `POST /models/test` — test one model role
-- `GET /config` — current application config
-- `PUT /config` — replace validated application config
+- `GET /health` — status, application version, RCA core version, deployment/profile.
+- `GET /system` — best-effort infrastructure telemetry.
+- `GET /capabilities` — backend/provider capabilities plus active model environment overrides.
+- `GET /models` — discovery using effective persisted/deployment configuration (compatibility endpoint).
+- `POST /models/discover` — discover models using the **current submitted role configuration**, without saving first.
+- `POST /models/test` — test the current submitted role configuration or the effective saved role when omitted.
+- `GET /config` — current effective application configuration.
+- `PUT /config` — persist validated application configuration.
+
+### Current-form model discovery
+
+```json
+{
+  "role": "small",
+  "config": {
+    "provider": "openai-compatible",
+    "endpoint": "http://127.0.0.1:8004/v1",
+    "model": "",
+    "temperature": 0.0,
+    "reasoning_effort": "provider_default",
+    "max_tokens": 6000,
+    "context_size": 32768,
+    "timeout_seconds": 10800,
+    "thinking_mode": "off",
+    "transport": "auto",
+    "api_token_env": "LM_API_TOKEN"
+  }
+}
+```
+
+The response contains `models` and the provider `catalog` where available. llama.cpp metadata such as `meta.n_ctx` is observational and can be displayed by the frontend.
 
 ## Files/examples
 
-- `POST /files` — multipart upload; returns `file_id`
-- `GET /files/{file_id}` — download uploaded file
+- `POST /files`
+- `GET /files/{file_id}`
 - `GET /examples/TEST-001`
 - `GET /examples/TEST-002`
 - `GET /examples/TEST-003`
@@ -28,31 +50,28 @@ Interactive OpenAPI docs are available at `/docs` when the backend is running.
 
 `POST /runs`
 
-Single case:
-
 ```json
-{"run_type":"single","raw_case":"...","label":"optional"}
+{
+  "run_type": "single",
+  "raw_case": "...",
+  "label": "optional",
+  "config_override": {"...": "complete ApplicationConfig snapshot"}
+}
 ```
 
-Built-in regression:
+`config_override` is optional. v1.8.6 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
 
-```json
-{"run_type":"builtin_regression","label":"TC1-TC3"}
-```
+Run types:
 
-Uploaded ZIP:
-
-```json
-{"run_type":"bundle","file_id":"...","label":"bundle"}
-```
+- `single`
+- `builtin_regression`
+- `bundle`
 
 Response returns quickly:
 
 ```json
-{"run_id":"TC12_...","status":"QUEUED"}
+{"run_id":"...","status":"QUEUED"}
 ```
-
-A full immutable config can optionally be supplied as `config_override`; otherwise the backend snapshots its current config at creation time.
 
 ### Inspect
 
@@ -63,33 +82,34 @@ A full immutable config can optionally be supplied as `config_override`; otherwi
 - `GET /runs/{run_id}/metrics`
 - `GET /runs/{run_id}/logs`
 - `GET /runs/{run_id}/result`
-- `GET /runs/{run_id}/events?after=N` — SSE event replay/live tail
+- `GET /runs/{run_id}/events?after=N`
 
-### Cancel
+Pipeline stages include persistent `input_text`, `output_text`, optional structured `input_data`/`output_data`, metadata and per-stage statistics when available.
+
+For batch runs, `result.cases` is updated and persisted after each successful or failed testcase rather than only at the end of the batch.
+
+### Cancel/download
 
 - `POST /runs/{run_id}/cancel`
-
-### Download
-
 - `GET /runs/{run_id}/report/download`
 - `GET /runs/{run_id}/session/download`
 
 ## Sessions
 
 - `GET /sessions`
-- `POST /sessions/save` with `{ "run_id": "..." }`
-- `POST /sessions/load` with a previously uploaded JSON `file_id` or inline `payload`
+- `POST /sessions/save`
+- `POST /sessions/load`
 - `GET /sessions/{session_id}`
 - `GET /sessions/{session_id}/download`
 
-Legacy v0.x desktop payloads are wrapped without field loss.
+Legacy desktop payloads remain wrapped/migrated with original payload retention.
 
 ## Authentication
 
-When the deployment profile has `auth_required: true`, all `/api/v1/*` requests require:
+When `auth_required=true`:
 
 ```text
 Authorization: Bearer <RCA_API_TOKEN>
 ```
 
-The Web UI obtains/stores that token only in the current browser session.
+Browser bearer tokens are session-scoped and are not committed in frontend source.

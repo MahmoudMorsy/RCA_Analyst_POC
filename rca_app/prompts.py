@@ -563,8 +563,8 @@ IMPORTANT BOUNDARIES
 """.strip()
 
 
-REQUIREMENT_COMPILATION_V084_PROMPT = r"""
-You are the v0.8.4 Requirement Semantic Compiler for an automotive RCA pipeline.
+REQUIREMENT_COMPILATION_V085_PROMPT = r"""
+You are the v0.8.5 Requirement Semantic Compiler for an automotive RCA pipeline.
 Return only the requested RequirementCompilationBatch schema.
 
 You receive requirements_to_compile plus reference_requirements for context.
@@ -601,8 +601,8 @@ not assign APPLICABLE/NOT APPLICABLE/SATISFIED/VIOLATED.
 """.strip()
 
 
-EVIDENCE_ANNOTATION_V084_PROMPT = r"""
-You are the v0.8.4 Evidence Semantic Annotator for an automotive RCA pipeline.
+EVIDENCE_ANNOTATION_V085_PROMPT = r"""
+You are the v0.8.5 Evidence Semantic Annotator for an automotive RCA pipeline.
 Return only the requested EvidenceAnnotationBatch schema.
 
 Annotate only evidence_requiring_language_interpretation. Structured timestamped
@@ -622,6 +622,10 @@ scope_id. Scope belongs to each EvidenceSemanticFact.scope object.
 
 For every semantic fact:
 - evidence_id and source_phrase must remain grounded in the supplied evidence;
+- operator MUST be exactly one of EQ, NEQ, LT, LTE, GT, GTE, PRESENT, ABSENT, OTHER. Never emit synonyms such as HAS, WAS, REACHES, CONTAINS, IS, BECOMES or NOT_APPLICABLE in the operator field;
+- fact resolution MUST be exactly VERIFIED, PARTIALLY_RESOLVED, or UNRESOLVED;
+- annotation resolution MUST be exactly VERIFIED, PARTIALLY_RESOLVED, or UNRESOLVED;
+- if the source relation cannot be faithfully represented by an allowed operator, use operator=OTHER and mark the fact PARTIALLY_RESOLVED/UNRESOLVED instead of inventing a new enum;
 - populate subject/operator/value only when the text explicitly supports them;
 - distinguish POINT_STATE, PERSISTENT_STATE, TRANSITION, TIMING, DIAGNOSTIC, or
   OTHER temporal semantics;
@@ -652,9 +656,11 @@ REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT = r"""
 You are an independent semantic verifier for an automotive RCA pipeline.
 Return only the requested RequirementSemanticVerificationBatch schema.
 
-For every supplied requirement, compare the ORIGINAL natural-language source
-against the COMPILED IR. Treat the compiled IR as untrusted. Verify that it
-preserves all material meaning, including:
+For every supplied requirement, first reconstruct the source semantics independently
+into independent_semantics, using only the ORIGINAL natural-language requirement.
+Only after that reconstruction, compare independent_semantics against COMPILED IR.
+Treat the compiled IR as untrusted and do not copy its Boolean grouping merely
+because it is present. Verify that it preserves all material meaning, including:
 - IF/state conditions;
 - WHEN/UPON triggers;
 - nested AND/OR/NOT;
@@ -664,6 +670,9 @@ preserves all material meaning, including:
 - explicit exceptions;
 - explicit requirement relationships/inherited scope.
 
+Always populate independent_semantics, even when resolution is not VERIFIED.
+Preserve nested Boolean grouping exactly in independent_semantics. In particular,
+A AND (B OR C) AND D is not equivalent to A AND (B AND (C OR D)).
 Use resolution VERIFIED only when the IR is semantically faithful. Use PARTIALLY_RESOLVED
 or UNRESOLVED when meaning is missing, altered, or genuinely ambiguous. When
 not VERIFIED, include the exact source span(s) that are missing or
@@ -672,7 +681,7 @@ misrepresented. Do not calculate compliance and do not repair the IR.
 
 
 SEMANTIC_ARBITRATION_PROMPT = r"""
-You are the single case-level semantic arbitrator for v0.8.4.
+You are the single case-level semantic arbitrator for v0.8.5.
 Return only the requested SemanticArbitrationResponse schema.
 
 A fast semantic compiler has already run, but Python detected one or more
@@ -700,6 +709,9 @@ a COMPLETE REPLACEMENT REPAIR, not another partial candidate:
 
 Evidence annotations returned here are also COMPLETE REPLACEMENT REPAIRS:
 - annotation resolution and every returned fact resolution must be VERIFIED;
+- a fact linked to compliance must materialize its meaning in subject/operator/value/temporal_semantics, not only in notes;
+- operator must be exactly EQ, NEQ, LT, LTE, GT, GTE, PRESENT, ABSENT, or OTHER;
+- do not return temporal_semantics=OTHER for a fact that is claimed to resolve a requirement/evidence compliance issue;
 - persistent-state facts require scope.resolution=RESOLVED AND a concrete
   non-empty scope.scope_id;
 - if evidence scope or meaning remains ambiguous, do not return a partial

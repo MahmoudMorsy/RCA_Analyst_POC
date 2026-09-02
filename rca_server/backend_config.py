@@ -39,6 +39,21 @@ class InferenceEngineConfig(BaseModel):
     provider_options: dict[str, Any] = Field(default_factory=dict)
 
 
+class ModelRoutingConfig(BaseModel):
+    """Select which configured model role performs critical semantic interpretation.
+
+    The role selection changes model capacity/transport only. It does not change
+    semantic authority: Python remains authoritative for deterministic compliance.
+    """
+
+    semantic_preparation_role: Literal["small", "primary"] = "small"
+    semantic_verification_role: Literal["small", "primary"] = "small"
+    semantic_preparation_reasoning_effort: str = "provider_default"
+    semantic_preparation_thinking_mode: str = "off"
+    semantic_verification_reasoning_effort: str = "provider_default"
+    semantic_verification_thinking_mode: str = "off"
+
+
 class DeploymentConfig(BaseModel):
     profile_name: str = "Local Dell"
     type: Literal["local", "runpod", "home", "custom"] = "local"
@@ -64,6 +79,7 @@ class ApplicationConfig(BaseModel):
     primary_model: ModelRoleConfig = Field(default_factory=ModelRoleConfig)
     small_model: ModelRoleConfig = Field(default_factory=lambda: ModelRoleConfig(temperature=0.0, reasoning_effort="provider_default", max_tokens=6000, thinking_mode="off"))
     inference: InferenceEngineConfig = Field(default_factory=InferenceEngineConfig)
+    model_routing: ModelRoutingConfig = Field(default_factory=ModelRoutingConfig)
 
     @classmethod
     def from_legacy(cls, legacy: AppConfig) -> "ApplicationConfig":
@@ -151,8 +167,25 @@ class BackendSettings:
 
 
 class ConfigStore:
+    ENV_OVERRIDES = {
+        "RCA_PRIMARY_ENDPOINT": "primary_model.endpoint",
+        "RCA_SMALL_ENDPOINT": "small_model.endpoint",
+        "RCA_PRIMARY_MODEL": "primary_model.model",
+        "RCA_SMALL_MODEL": "small_model.model",
+        "RCA_PRIMARY_PROVIDER": "primary_model.provider",
+        "RCA_SMALL_PROVIDER": "small_model.provider",
+    }
+
     def __init__(self, path: Path):
         self.path = path
+
+    @classmethod
+    def environment_overrides(cls) -> dict[str, dict[str, str]]:
+        return {
+            field: {"env": env_name, "value": os.environ[env_name]}
+            for env_name, field in cls.ENV_OVERRIDES.items()
+            if os.environ.get(env_name)
+        }
 
     def load(self) -> ApplicationConfig:
         cfg = None

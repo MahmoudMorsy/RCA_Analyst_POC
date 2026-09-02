@@ -46,6 +46,8 @@ class PipelineStage(BaseModel):
     elapsed_ms: Optional[float] = None
     input_text: str = ""
     output_text: str = ""
+    input_data: Optional[Any] = None
+    output_data: Optional[Any] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -85,6 +87,12 @@ class SessionLoadRequest(BaseModel):
 
 class ModelTestRequest(BaseModel):
     role: Literal["primary", "small"] = "primary"
+    config: Optional[ModelRoleConfig] = None
+
+
+class ModelDiscoverRequest(BaseModel):
+    role: Literal["primary", "small"] = "primary"
+    config: ModelRoleConfig
 
 
 class ConfigUpdateRequest(BaseModel):

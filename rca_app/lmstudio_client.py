@@ -280,15 +280,19 @@ class LMStudioClient:
             headers["Authorization"] = f"Bearer {self.api_token}"
         return headers
 
-    def list_models(self) -> list[str]:
+    def model_catalog(self) -> list[dict[str, Any]]:
+        """Return provider-advertised model metadata without interpreting it."""
         url = f"{self.base_url}/models"
         try:
             r = requests.get(url, headers=self.headers, timeout=15)
             r.raise_for_status()
             data = r.json()
-            return [str(item["id"]) for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]
+            return [dict(item) for item in data.get("data", []) if isinstance(item, dict)]
         except Exception as exc:
-            raise LMStudioError(f"Could not query LM Studio models at {url}: {exc}") from exc
+            raise LMStudioError(f"Could not query model catalog at {url}: {exc}") from exc
+
+    def list_models(self) -> list[str]:
+        return [str(item["id"]) for item in self.model_catalog() if item.get("id")]
 
     def test_connection(self) -> tuple[bool, str]:
         models = self.list_models()

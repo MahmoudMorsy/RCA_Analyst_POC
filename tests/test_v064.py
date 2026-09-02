@@ -114,8 +114,8 @@ def test_v064_version_history_contains_every_changelog_release_in_chronological_
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     history = (root / "VERSION_HISTORY.md").read_text(encoding="utf-8")
     versions = re.findall(r"(?m)^##\s+([0-9][^\n]*)$", changelog)
-    assert versions[0] == "1.8.5"
+    assert versions[0] == "1.8.6"
     for version in versions:
         assert f"v{version}" in history
     assert "## v0.6.3 → v0.6.4" in history
-    assert "Current release:** v1.8.5" in history
+    assert "Current release:** v1.8.6" in history

@@ -46,6 +46,7 @@ from .models import (
     ValidationIssue,
     ValidationSeverity,
 )
+from . import RCA_CORE_VERSION
 from .prompts import (
     FAST_ATOMIC_CLAIM_PROMPT,
     FAST_CONTENT_CLASSIFIER_PROMPT,
@@ -60,8 +61,8 @@ from .prompts import (
     REQUIREMENT_REASONING_PROMPT,
     SEMANTIC_ANALYZER_PROMPT,
     TARGETED_REQUIREMENT_REPAIR_PROMPT,
-    REQUIREMENT_COMPILATION_V084_PROMPT,
-    EVIDENCE_ANNOTATION_V084_PROMPT,
+    REQUIREMENT_COMPILATION_V085_PROMPT,
+    EVIDENCE_ANNOTATION_V085_PROMPT,
     REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
     SEMANTIC_ARBITRATION_PROMPT,
     RCA_SYNTHESIS_V080_PROMPT,
@@ -92,9 +93,9 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.4 adaptive semantic-compiler RCA architecture.
+    """v0.8.5 adaptive semantic-compiler RCA architecture.
 
-    Production v0.8 performs bounded fast semantic preparation that compiles
+    Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
     evidence. Python executes only verified IR/facts and owns compliance truth.
     The 27B is conditional: one batched semantic-arbitration call when material
@@ -130,6 +131,7 @@ class RCAPipeline:
         primary_phase_a_chunk_size: int = 6,
         semantic_preparation_client: Optional[ModelClient] = None,
         semantic_preparation_enabled: bool = False,
+        semantic_verification_client: Optional[ModelClient] = None,
         semantic_arbitration_client: Optional[ModelClient] = None,
         semantic_arbitration_enabled: bool = True,
         rca_synthesis_enabled: bool = True,
@@ -146,6 +148,7 @@ class RCAPipeline:
         self.hypothesis_review_client = hypothesis_review_client or self.final_review_client or self.intake_client
         self.semantic_preparation_client = semantic_preparation_client
         self.semantic_preparation_enabled = bool(semantic_preparation_enabled and semantic_preparation_client is not None)
+        self.semantic_verification_client = semantic_verification_client or semantic_preparation_client
         self.semantic_arbitration_client = semantic_arbitration_client or client
         self.semantic_arbitration_enabled = bool(semantic_arbitration_enabled)
         self.rca_synthesis_enabled = bool(rca_synthesis_enabled)
@@ -381,10 +384,11 @@ class RCAPipeline:
             + (" then annotating language evidence..." if language_evidence else "..."),
         )
         self._emit_trace(
-            trace, "06_semantic_preparation", "4B Semantic Preparation", "running",
+            trace, "06_semantic_preparation", "Semantic Preparation", "running",
             "Requirement compilation and evidence annotation are isolated components; failures/retries are component-specific and no compliance decision is made.",
             input_value={
-                "model": getattr(self.semantic_preparation_client, "model", ""),
+                "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
+                "verification_client": self._client_trace_descriptor(self.semantic_verification_client, "semantic_verification"),
                 "requirement_batches": [[x.requirement_id for x in batch] for batch in requirement_batches],
                 "language_evidence_count": len(language_evidence),
                 "combined_small_case_call": False,
@@ -396,29 +400,44 @@ class RCAPipeline:
         for batch_index, batch in enumerate(requirement_batches, start=1):
             self._check_cancelled(f"4B requirement compilation batch {batch_index}")
             batch_prompt = self._semantic_requirement_batch_prompt(canonical, batch)
+            batch_stage_id = f"06_req_{batch_index:02d}"
+            self._emit_trace(
+                trace, batch_stage_id, f"Requirement Compilation / Batch {batch_index}", "running",
+                f"Compiling {len(batch)} requirement(s) into executable Requirement IR.",
+                input_value={
+                    "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
+                    "requirement_ids": [x.requirement_id for x in batch],
+                    "request": json.loads(batch_prompt),
+                },
+            )
             try:
                 try:
                     response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=REQUIREMENT_COMPILATION_V084_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
                         user_prompt=batch_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_compilation_v084",
+                        schema_name="rca_requirement_compilation_v085",
                     )
                 except AttributeError:
                     response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=REQUIREMENT_COMPILATION_V084_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
                         user_prompt=batch_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_compilation_v084",
+                        schema_name="rca_requirement_compilation_v085",
                     )
             except ModelGatewayError as exc:
                 stats.append(exc.stats)
                 attempts.append(self._make_failed_attempt(
                     len(attempts) + 1,
                     f"semantic_preparation_requirements_{batch_index}",
-                    "FAST_REQUIREMENT_COMPILER",
+                    "SEMANTIC_REQUIREMENT_COMPILER",
                     exc,
                 ))
+                self._emit_trace(
+                    trace, batch_stage_id, f"Requirement Compilation / Batch {batch_index}", "failed",
+                    "Requirement compilation failed after bounded structured-output handling.",
+                    output_value={"error": str(exc), "finish_reason": exc.finish_reason, "retry_diagnostics": exc.retry_diagnostics},
+                )
                 raise PipelineValidationError(
                     "Semantic requirement compilation failed; v0.8 does not fall back to raw-language Python interpretation.\n" + str(exc),
                     canonical_case=canonical, attempts=attempts, stats=stats,
@@ -427,11 +446,21 @@ class RCAPipeline:
             attempts.append(self._make_aux_attempt(
                 len(attempts) + 1,
                 f"semantic_preparation_requirements_{batch_index}",
-                "FAST_REQUIREMENT_COMPILER",
+                "SEMANTIC_REQUIREMENT_COMPILER",
                 response,
             ))
             compiled_batches.append(response.parsed)
             raw_parts.append(response.raw_json)
+            self._emit_trace(
+                trace, batch_stage_id, f"Requirement Compilation / Batch {batch_index}", "complete",
+                f"Compiled {len(response.parsed.requirement_irs)} Requirement IR object(s).",
+                output_value={
+                    "compiled": response.parsed,
+                    "model_call": response.stats,
+                    "finish_reason": response.finish_reason,
+                    "transport": response.transport,
+                },
+            )
 
         # Merge requirement compilation first so Requirement IR structural
         # completion can run independently before the evidence component.
@@ -450,36 +479,36 @@ class RCAPipeline:
             self._check_cancelled("4B structural IR completion")
             structural_prompt = self._semantic_structural_repair_prompt(canonical, repair_batch, structural_issues)
             self._emit_trace(
-                trace, "06a_structural_ir_completion", "4B Structural IR Completion", "running",
+                trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "running",
                 f"Recompiling {len(repair_ids)} requirement(s) with transport-level IR defects before semantic verification.",
                 input_value={"requirement_ids": repair_ids, "issues": [x.model_dump(mode="json") for x in structural_issues]},
             )
             try:
                 try:
                     structural_response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=REQUIREMENT_COMPILATION_V084_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
                         user_prompt=structural_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_structural_completion_v084",
+                        schema_name="rca_requirement_structural_completion_v085",
                     )
                 except AttributeError:
                     structural_response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=REQUIREMENT_COMPILATION_V084_PROMPT,
+                        system_prompt=REQUIREMENT_COMPILATION_V085_PROMPT,
                         user_prompt=structural_prompt,
                         response_model=RequirementCompilationBatch,
-                        schema_name="rca_requirement_structural_completion_v084",
+                        schema_name="rca_requirement_structural_completion_v085",
                     )
                 stats.append(structural_response.stats)
                 attempts.append(self._make_aux_attempt(
                     len(attempts) + 1, "semantic_structural_completion",
-                    "FAST_SEMANTIC_STRUCTURAL_COMPLETION", structural_response
+                    "SEMANTIC_STRUCTURAL_COMPLETION", structural_response
                 ))
                 semantic_preparation = self._replace_requirement_irs(
                     semantic_preparation, structural_response.parsed.requirement_irs, repair_ids
                 )
                 remaining_structural = self.semantic_integrity_checker.structural_requirement_issues(semantic_preparation)
                 self._emit_trace(
-                    trace, "06a_structural_ir_completion", "4B Structural IR Completion",
+                    trace, "06a_structural_ir_completion", "Semantic Structural IR Completion",
                     "attention" if remaining_structural else "complete",
                     f"Structural completion finished; {len(remaining_structural)} transport-level defect(s) remain and will be handled conservatively by verification/arbitration.",
                     output_value=structural_response.parsed,
@@ -488,16 +517,16 @@ class RCAPipeline:
                 stats.append(exc.stats)
                 attempts.append(self._make_failed_attempt(
                     len(attempts) + 1, "semantic_structural_completion",
-                    "FAST_SEMANTIC_STRUCTURAL_COMPLETION", exc
+                    "SEMANTIC_STRUCTURAL_COMPLETION", exc
                 ))
                 self._emit_trace(
-                    trace, "06a_structural_ir_completion", "4B Structural IR Completion", "attention",
+                    trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "attention",
                     "The bounded cheap structural completion call failed; original partial IR is retained and the normal verifier/arbitration path remains authoritative.",
                     output_value={"error": str(exc)},
                 )
         else:
             self._emit_trace(
-                trace, "06a_structural_ir_completion", "4B Structural IR Completion", "skipped",
+                trace, "06a_structural_ir_completion", "Semantic Structural IR Completion", "skipped",
                 "No transport-level Requirement IR defect requires targeted recompilation.", output_value="Skipped."
             )
 
@@ -505,35 +534,48 @@ class RCAPipeline:
         # separate from Requirement IR compilation so schema failure remains
         # local to the evidence component.
         if language_evidence:
-            self._check_cancelled("4B evidence semantic annotation")
+            self._check_cancelled("evidence semantic annotation")
             evidence_prompt = self._semantic_evidence_batch_prompt(canonical)
+            self._emit_trace(
+                trace, "06b_evidence_annotation", "Evidence Semantic Annotation", "running",
+                f"Interpreting {len(language_evidence)} language evidence item(s) into structured facts.",
+                input_value={
+                    "model_client": self._client_trace_descriptor(self.semantic_preparation_client, "semantic_preparation"),
+                    "request": json.loads(evidence_prompt),
+                },
+            )
             try:
                 try:
                     response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=EVIDENCE_ANNOTATION_V084_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
                         user_prompt=evidence_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_annotation_v084",
+                        schema_name="rca_evidence_annotation_v085",
                     )
                 except AttributeError:
                     response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=EVIDENCE_ANNOTATION_V084_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
                         user_prompt=evidence_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_annotation_v084",
+                        schema_name="rca_evidence_annotation_v085",
                     )
             except ModelGatewayError as exc:
                 stats.append(exc.stats)
                 attempts.append(self._make_failed_attempt(
-                    len(attempts) + 1, "semantic_preparation_evidence", "FAST_EVIDENCE_ANNOTATOR", exc
+                    len(attempts) + 1, "semantic_preparation_evidence", "SEMANTIC_EVIDENCE_ANNOTATOR", exc
                 ))
+                self._emit_trace(
+                    trace, "06b_evidence_annotation", "Evidence Semantic Annotation", "failed",
+                    "Evidence annotation failed after bounded structured-output handling.",
+                    output_value={"error": str(exc), "finish_reason": exc.finish_reason, "retry_diagnostics": exc.retry_diagnostics},
+                )
                 raise PipelineValidationError(
                     "Semantic evidence annotation failed; unresolved natural-language evidence is not converted by Python.\n" + str(exc),
                     canonical_case=canonical, attempts=attempts, stats=stats,
                 ) from exc
             stats.append(response.stats)
             attempts.append(self._make_aux_attempt(
-                len(attempts) + 1, "semantic_preparation_evidence", "FAST_EVIDENCE_ANNOTATOR", response
+                len(attempts) + 1, "semantic_preparation_evidence", "SEMANTIC_EVIDENCE_ANNOTATOR", response
             ))
             semantic_preparation.evidence_annotations = copy.deepcopy(response.parsed.evidence_annotations)
             for note in response.parsed.unresolved_case_semantics:
@@ -541,6 +583,22 @@ class RCAPipeline:
                     semantic_preparation.unresolved_case_semantics.append(note)
             raw_parts.append(response.raw_json)
             raw_llm_json = "\n\n".join(x for x in raw_parts if x)
+            self._emit_trace(
+                trace, "06b_evidence_annotation", "Evidence Semantic Annotation", "complete",
+                f"Produced {len(response.parsed.evidence_annotations)} evidence annotation object(s).",
+                output_value={
+                    "annotations": response.parsed,
+                    "model_call": response.stats,
+                    "finish_reason": response.finish_reason,
+                    "transport": response.transport,
+                },
+            )
+        else:
+            self._emit_trace(
+                trace, "06b_evidence_annotation", "Evidence Semantic Annotation", "skipped",
+                "No language-derived evidence requires semantic annotation.",
+                output_value="Skipped.",
+            )
 
         # 06c: component-specific evidence repair. Transport/envelope
         # normalization is handled by the Pydantic model; remaining structured
@@ -554,7 +612,7 @@ class RCAPipeline:
                 canonical, repair_evidence_ids, evidence_structural_issues
             )
             self._emit_trace(
-                trace, "06c_evidence_completion", "4B Evidence Semantic Completion", "running",
+                trace, "06c_evidence_completion", "Evidence Semantic Completion", "running",
                 f"Reannotating {len(repair_evidence_ids)} evidence item(s) with structured semantic defects; no requirement recompilation is repeated.",
                 input_value={
                     "evidence_ids": repair_evidence_ids,
@@ -564,29 +622,29 @@ class RCAPipeline:
             try:
                 try:
                     evidence_repair_response = self.semantic_preparation_client.structured_repair(
-                        system_prompt=EVIDENCE_ANNOTATION_V084_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
                         user_prompt=evidence_repair_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_structural_completion_v084",
+                        schema_name="rca_evidence_structural_completion_v085",
                     )
                 except AttributeError:
                     evidence_repair_response = self.semantic_preparation_client.structured_chat(
-                        system_prompt=EVIDENCE_ANNOTATION_V084_PROMPT,
+                        system_prompt=EVIDENCE_ANNOTATION_V085_PROMPT,
                         user_prompt=evidence_repair_prompt,
                         response_model=EvidenceAnnotationBatch,
-                        schema_name="rca_evidence_structural_completion_v084",
+                        schema_name="rca_evidence_structural_completion_v085",
                     )
                 stats.append(evidence_repair_response.stats)
                 attempts.append(self._make_aux_attempt(
                     len(attempts) + 1, "semantic_evidence_completion",
-                    "FAST_EVIDENCE_SEMANTIC_COMPLETION", evidence_repair_response
+                    "SEMANTIC_EVIDENCE_COMPLETION", evidence_repair_response
                 ))
                 semantic_preparation = self._replace_evidence_annotations(
                     semantic_preparation, evidence_repair_response.parsed.evidence_annotations, repair_evidence_ids
                 )
                 remaining_evidence_structural = self.semantic_integrity_checker.structural_evidence_issues(semantic_preparation)
                 self._emit_trace(
-                    trace, "06c_evidence_completion", "4B Evidence Semantic Completion",
+                    trace, "06c_evidence_completion", "Evidence Semantic Completion",
                     "attention" if remaining_evidence_structural else "complete",
                     f"Evidence completion finished; {len(remaining_evidence_structural)} structured evidence defect(s) remain for conservative integrity/arbitration handling.",
                     output_value=evidence_repair_response.parsed,
@@ -595,23 +653,23 @@ class RCAPipeline:
                 stats.append(exc.stats)
                 attempts.append(self._make_failed_attempt(
                     len(attempts) + 1, "semantic_evidence_completion",
-                    "FAST_EVIDENCE_SEMANTIC_COMPLETION", exc
+                    "SEMANTIC_EVIDENCE_COMPLETION", exc
                 ))
                 self._emit_trace(
-                    trace, "06c_evidence_completion", "4B Evidence Semantic Completion", "attention",
+                    trace, "06c_evidence_completion", "Evidence Semantic Completion", "attention",
                     "Targeted evidence completion failed; partial annotations are retained and Python will not promote unresolved persistence to executable interval evidence.",
                     output_value={"error": str(exc)},
                 )
         else:
             self._emit_trace(
-                trace, "06c_evidence_completion", "4B Evidence Semantic Completion", "skipped",
+                trace, "06c_evidence_completion", "Evidence Semantic Completion", "skipped",
                 "No structured evidence annotation defect requires targeted reannotation.", output_value="Skipped."
             )
 
         canonical.requirement_irs = copy.deepcopy(semantic_preparation.requirement_irs)
         canonical.evidence_annotations = copy.deepcopy(semantic_preparation.evidence_annotations)
         self._emit_trace(
-            trace, "06_semantic_preparation", "4B Semantic Preparation", "complete",
+            trace, "06_semantic_preparation", "Semantic Preparation", "complete",
             f"Compiled {len(semantic_preparation.requirement_irs)} Requirement IR(s) across {len(requirement_batches)} bounded batch(es); "
             f"evidence annotation ran as a separate component and retained {len(semantic_preparation.evidence_annotations)} annotation object(s).",
             output_value=semantic_preparation,
@@ -621,31 +679,35 @@ class RCAPipeline:
         # compact fast-model audit, not a second compiler and not a compliance
         # decision. It exists because a compiler can otherwise omit a source
         # clause from both its IR and its own self-audit inventory.
-        self._check_cancelled("4B semantic verification")
+        self._check_cancelled("semantic verification")
         verify_prompt = self._semantic_verification_user_prompt(canonical, semantic_preparation)
         self._emit_trace(
-            trace, "06d_semantic_verification", "4B Requirement Semantic Verification", "running",
-            "Original requirements are independently compared with the compiled IRs so silent semantic omissions can be escalated before Python execution.",
-            input_value={"requirement_count": len(canonical.requirements)},
+            trace, "06d_semantic_verification", "Requirement Semantic Verification", "running",
+            "Original requirements are independently reconstructed and structurally compared with compiled IRs before Python execution.",
+            input_value={
+                "model_client": self._client_trace_descriptor(self.semantic_verification_client, "semantic_verification"),
+                "requirement_count": len(canonical.requirements),
+                "verification_request": json.loads(verify_prompt),
+            },
         )
         try:
-            verify_response = self.semantic_preparation_client.structured_repair(
+            verify_response = self.semantic_verification_client.structured_repair(
                 system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
                 user_prompt=verify_prompt,
                 response_model=RequirementSemanticVerificationBatch,
-                schema_name="rca_requirement_semantic_verification_v084",
+                schema_name="rca_requirement_semantic_verification_v085",
             )
         except AttributeError:
-            verify_response = self.semantic_preparation_client.structured_chat(
+            verify_response = self.semantic_verification_client.structured_chat(
                 system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
                 user_prompt=verify_prompt,
                 response_model=RequirementSemanticVerificationBatch,
-                schema_name="rca_requirement_semantic_verification_v084",
+                schema_name="rca_requirement_semantic_verification_v085",
             )
         except ModelGatewayError as exc:
             stats.append(exc.stats)
             attempts.append(self._make_failed_attempt(
-                len(attempts) + 1, "semantic_verification", "FAST_SEMANTIC_VERIFIER", exc
+                len(attempts) + 1, "semantic_verification", "SEMANTIC_VERIFIER", exc
             ))
             raise PipelineValidationError(
                 "Independent semantic verification failed; unverified Requirement IR is not executed.\n" + str(exc),
@@ -653,14 +715,20 @@ class RCAPipeline:
             ) from exc
         stats.append(verify_response.stats)
         attempts.append(self._make_aux_attempt(
-            len(attempts) + 1, "semantic_verification", "FAST_SEMANTIC_VERIFIER", verify_response
+            len(attempts) + 1, "semantic_verification", "SEMANTIC_VERIFIER", verify_response
         ))
-        verification_issues = self._semantic_verification_issues(canonical, verify_response.parsed)
+        verification_issues = self._semantic_verification_issues(canonical, semantic_preparation, verify_response.parsed)
         self._emit_trace(
-            trace, "06d_semantic_verification", "4B Requirement Semantic Verification",
+            trace, "06d_semantic_verification", "Requirement Semantic Verification",
             "attention" if verification_issues else "complete",
             f"Independent verifier identified {len(verification_issues)} material semantic mismatch(es).",
-            output_value=verify_response.parsed,
+            output_value={
+                "verification": verify_response.parsed,
+                "issues": [x.model_dump(mode="json") for x in verification_issues],
+                "model_call": verify_response.stats,
+                "finish_reason": verify_response.finish_reason,
+                "transport": verify_response.transport,
+            },
         )
 
         # 07: structural integrity/materiality analysis. Python never reads the
@@ -686,7 +754,7 @@ class RCAPipeline:
                     system_prompt=SEMANTIC_ARBITRATION_PROMPT,
                     user_prompt=arb_prompt,
                     response_model=SemanticArbitrationResponse,
-                    schema_name="rca_semantic_arbitration_v084",
+                    schema_name="rca_semantic_arbitration_v085",
                 )
                 stats.append(arb_response.stats)
                 attempts.append(self._make_aux_attempt(len(attempts)+1, "semantic_arbitration", "PRIMARY_SEMANTIC_ARBITRATION", arb_response))
@@ -698,33 +766,56 @@ class RCAPipeline:
                 # Re-run the compact fast semantic verifier on repaired IRs. The
                 # 27B is not called again even if material ambiguity remains.
                 post_verify_prompt = self._semantic_verification_user_prompt(canonical, semantic_preparation)
+                self._emit_trace(
+                    trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "running",
+                    "Reconstructing requirement semantics independently after arbitration before deterministic execution.",
+                    input_value={
+                        "model_client": self._client_trace_descriptor(self.semantic_verification_client, "semantic_verification"),
+                        "verification_request": json.loads(post_verify_prompt),
+                    },
+                )
                 try:
                     try:
-                        post_verify_response = self.semantic_preparation_client.structured_repair(
+                        post_verify_response = self.semantic_verification_client.structured_repair(
                             system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
                             user_prompt=post_verify_prompt,
                             response_model=RequirementSemanticVerificationBatch,
-                            schema_name="rca_requirement_semantic_verification_post_arbitration_v084",
+                            schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
                         )
                     except AttributeError:
-                        post_verify_response = self.semantic_preparation_client.structured_chat(
+                        post_verify_response = self.semantic_verification_client.structured_chat(
                             system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
                             user_prompt=post_verify_prompt,
                             response_model=RequirementSemanticVerificationBatch,
-                            schema_name="rca_requirement_semantic_verification_post_arbitration_v084",
+                            schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
                         )
                     stats.append(post_verify_response.stats)
                     attempts.append(self._make_aux_attempt(
                         len(attempts) + 1, "semantic_verification_post_arbitration",
-                        "FAST_SEMANTIC_VERIFIER", post_verify_response
+                        "SEMANTIC_VERIFIER", post_verify_response
                     ))
-                    post_verification_issues = self._semantic_verification_issues(canonical, post_verify_response.parsed)
+                    post_verification_issues = self._semantic_verification_issues(canonical, semantic_preparation, post_verify_response.parsed)
+                    self._emit_trace(
+                        trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification",
+                        "attention" if post_verification_issues else "complete",
+                        f"Verifier identified {len(post_verification_issues)} material mismatch(es) after arbitration.",
+                        output_value={
+                            "verification": post_verify_response.parsed,
+                            "issues": [x.model_dump(mode="json") for x in post_verification_issues],
+                            "model_call": post_verify_response.stats,
+                        },
+                    )
                 except ModelGatewayError as verify_exc:
                     stats.append(verify_exc.stats)
                     attempts.append(self._make_failed_attempt(
                         len(attempts) + 1, "semantic_verification_post_arbitration",
-                        "FAST_SEMANTIC_VERIFIER", verify_exc
+                        "SEMANTIC_VERIFIER", verify_exc
                     ))
+                    self._emit_trace(
+                        trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "failed",
+                        "Post-arbitration semantic verification failed; repaired IR remains unverified.",
+                        output_value={"error": str(verify_exc), "finish_reason": verify_exc.finish_reason, "retry_diagnostics": verify_exc.retry_diagnostics},
+                    )
                     post_verification_issues = [
                         SemanticIntegrityIssue(
                             issue_id=f"VERIFY-POST-{idx:03d}",
@@ -866,9 +957,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.4 analysis is ready for session export.",
+                         "Validated v0.8.5 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.4 analysis completed.")
+        progress("Complete", "v0.8.5 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1164,9 +1255,77 @@ class RCAPipeline:
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
     @staticmethod
-    def _semantic_verification_issues(canonical: CanonicalCase, verification: RequirementSemanticVerificationBatch) -> list[SemanticIntegrityIssue]:
+    def _normalized_semantic_value(value) -> str:
+        return str(value or "").strip().casefold()
+
+    @classmethod
+    def _logic_signature(cls, node):
+        if node is None:
+            return None
+        kind = node.kind.value
+        if kind == "PREDICATE":
+            return (kind, cls._normalized_semantic_value(node.signal), node.operator.value, cls._normalized_semantic_value(node.value))
+        children = [cls._logic_signature(x) for x in node.children]
+        if kind in {"AND", "OR"}:
+            children = sorted(children, key=repr)
+        return (kind, tuple(children))
+
+    @classmethod
+    def _semantic_fingerprint_signature(cls, fp) -> dict:
+        def event(x):
+            return None if x is None else (cls._normalized_semantic_value(x.signal), cls._normalized_semantic_value(x.event), cls._normalized_semantic_value(x.value))
+        def behavior(x):
+            return None if x is None else (cls._normalized_semantic_value(x.signal), x.operator.value, cls._normalized_semantic_value(x.value), cls._normalized_semantic_value(x.event), cls._normalized_semantic_value(x.process_description))
+        def timing(x):
+            return None if x is None else (x.limit_ms, cls._normalized_semantic_value(x.relation))
+        def persistence(x):
+            return None if x is None else (bool(x.required), cls._normalized_semantic_value(x.scope))
+        rels = sorted((cls._normalized_semantic_value(x.relationship_type), cls._normalized_semantic_value(x.target_requirement_id)) for x in fp.relationships)
+        return {
+            "normative_type": fp.normative_type.value,
+            "condition": cls._logic_signature(fp.condition),
+            "trigger": event(fp.trigger),
+            "required_behavior": behavior(fp.required_behavior),
+            "timing": timing(fp.timing),
+            "persistence": persistence(fp.persistence),
+            "relationships": rels,
+        }
+
+    @classmethod
+    def _ir_semantic_signature(cls, ir) -> dict:
+        class View:
+            pass
+        view = View()
+        for name in ("normative_type", "condition", "trigger", "required_behavior", "timing", "persistence", "relationships"):
+            setattr(view, name, getattr(ir, name))
+        return cls._semantic_fingerprint_signature(view)
+
+    @staticmethod
+    def _client_trace_descriptor(client, role: str) -> dict:
+        if client is None:
+            return {"role": role, "configured": False}
+        resolved_transport = ""
+        try:
+            resolved_transport = client.resolve_transport()
+        except Exception:
+            resolved_transport = getattr(client, "transport", "")
+        return {
+            "role": role,
+            "configured": True,
+            "endpoint": getattr(client, "base_url", ""),
+            "model": getattr(client, "model", ""),
+            "transport": resolved_transport,
+            "thinking": getattr(client, "thinking_mode", ""),
+            "reasoning": getattr(client, "reasoning_effort", ""),
+            "temperature": getattr(client, "temperature", None),
+            "max_tokens": getattr(client, "max_tokens", None),
+        }
+
+    @classmethod
+    def _semantic_verification_issues(cls, canonical: CanonicalCase, preparation: SemanticPreparation, verification: RequirementSemanticVerificationBatch) -> list[SemanticIntegrityIssue]:
         expected = {x.requirement_id for x in canonical.requirements}
         returned = {x.requirement_id for x in verification.requirements}
+        candidates = {x.requirement_id: x for x in preparation.requirement_irs}
         issues = []
         seq = 1
         for rid in sorted(expected - returned):
@@ -1185,6 +1344,29 @@ class RCAPipeline:
                 ))
                 seq += 1
                 continue
+            candidate = candidates.get(item.requirement_id)
+            if candidate is None:
+                issues.append(SemanticIntegrityIssue(
+                    issue_id=f"VERIFY-{seq:03d}", requirement_id=item.requirement_id,
+                    description="Independent semantic verifier returned semantics for a requirement with no compiler IR candidate.",
+                    material_to_compliance=True,
+                ))
+                seq += 1
+                continue
+            independent_signature = cls._semantic_fingerprint_signature(item.independent_semantics)
+            candidate_signature = cls._ir_semantic_signature(candidate)
+            mismatched_fields = [k for k in independent_signature if independent_signature[k] != candidate_signature[k]]
+            if mismatched_fields:
+                issues.append(SemanticIntegrityIssue(
+                    issue_id=f"VERIFY-{seq:03d}", requirement_id=item.requirement_id,
+                    description=(
+                        "Independent source-semantic reconstruction disagrees with compiled IR in: "
+                        + ", ".join(mismatched_fields)
+                        + ". Compiler/verifier prose agreement cannot override this structured mismatch."
+                    ),
+                    material_to_compliance=True,
+                ))
+                seq += 1
             if item.resolution.value != "VERIFIED":
                 detail = "; ".join(item.missing_or_misrepresented_source_spans) or item.notes or item.resolution.value
                 issues.append(SemanticIntegrityIssue(
@@ -2200,17 +2382,30 @@ class RCAPipeline:
         )
 
     @staticmethod
-    def _trace_value(value) -> str:
+    def _trace_data(value):
         if value is None:
-            return ""
-        if isinstance(value, str):
-            return value
+            return None
         if hasattr(value, "model_dump"):
-            value = value.model_dump(mode="json")
+            return value.model_dump(mode="json")
+        if isinstance(value, dict):
+            return {str(k): RCAPipeline._trace_data(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [RCAPipeline._trace_data(v) for v in value]
+        if isinstance(value, (str, int, float, bool)):
+            return value
+        return str(value)
+
+    @classmethod
+    def _trace_value(cls, value) -> str:
+        data = cls._trace_data(value)
+        if data is None:
+            return ""
+        if isinstance(data, str):
+            return data
         try:
-            return json.dumps(value, indent=2, ensure_ascii=False)
+            return json.dumps(data, indent=2, ensure_ascii=False)
         except TypeError:
-            return str(value)
+            return str(data)
 
     @classmethod
     def _emit_trace(
@@ -2237,6 +2432,8 @@ class RCAPipeline:
                 "summary": summary,
                 "input_text": cls._trace_value(input_value),
                 "output_text": cls._trace_value(output_value),
+                "input_data": cls._trace_data(input_value),
+                "output_data": cls._trace_data(output_value),
             })
         except Exception:
             pass

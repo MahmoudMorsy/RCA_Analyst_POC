@@ -61,5 +61,8 @@ class ModelGateway:
     def list_models(self, spec: ModelClientSpec) -> list[str]:
         return self.create_client(spec).list_models()
 
+    def model_catalog(self, spec: ModelClientSpec) -> list[dict]:
+        return self.create_client(spec).model_catalog()
+
     def test_connection(self, spec: ModelClientSpec) -> tuple[bool, str]:
         return self.create_client(spec).test_connection()

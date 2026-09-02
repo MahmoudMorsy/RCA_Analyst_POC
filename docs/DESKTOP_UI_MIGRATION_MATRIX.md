@@ -110,3 +110,24 @@ Desktop `stage_label` + indeterminate/progress bar become the Web **Run Status B
 ## Functional parity rule
 
 The Web frontend has zero RCA decision logic. It may capability-gate controls and render backend state, but all RCA routing, retries, repairs, compliance, validation and model-role decisions remain backend/core responsibilities.
+
+---
+
+## v1.8.6 Web-parity repair addendum
+
+The v1.8.4 matrix remains the historical desktop-to-Web migration baseline. v1.8.6 closes live migration defects discovered during Dell/RunPod use:
+
+| Surface | v1.8.5 defect | v1.8.6 behavior |
+|---|---|---|
+| Stage Input/Output | later stage event could erase earlier input | backend merges repeated stage updates; structured and raw views persist |
+| Verified Semantic Representation | raw JSON was difficult to inspect | human-readable nested renderer + Raw JSON |
+| Batch result tabs | aggregate batch JSON only; other tabs stayed empty | selected testcase populates all result/forensic tabs |
+| Batch progress | useful result available mainly after batch end | case result persisted/published after each success/failure |
+| API Stats | no complete per-case/per-stage aggregation | testcase/stage/model-call statistics with failed calls included |
+| Model discovery | used last persisted endpoint | discovers the endpoint currently typed in the form |
+| Model test | test/reload could reset unsaved edits | explicit form values can be tested without replacing local edits |
+| Environment overrides | save appeared to revert | active overrides are visible; runs carry explicit config snapshots |
+| Inference engine controls | could imply backend-controlled external process | capability-disabled/labeled server-managed unless backend owns lifecycle |
+| Critical semantic model | hard to test stronger model without endpoint workaround | preparation and verification independently route Small / Utility or Primary |
+
+These changes remain presentation/configuration/routing boundaries. The frontend still contains zero RCA decision logic.

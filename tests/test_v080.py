@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from rca_app.models import (
     RequirementIR,
     RequirementCompilationBatch,
     EvidenceAnnotationBatch,
+    RequirementSemanticFingerprint,
     RequirementSemanticVerificationItem,
     RequirementSemanticVerificationBatch,
     RequirementPersistenceIR,
@@ -214,24 +216,46 @@ def result_map(validated):
     return {x.analysis.requirement_id: x for x in validated.requirement_results}
 
 
-def verified_semantic_verification(canonical):
+def verification_fingerprint_from_ir(ir):
+    return RequirementSemanticFingerprint(
+        normative_type=ir.normative_type,
+        condition=copy.deepcopy(ir.condition),
+        trigger=copy.deepcopy(ir.trigger),
+        required_behavior=copy.deepcopy(ir.required_behavior),
+        timing=copy.deepcopy(ir.timing),
+        persistence=copy.deepcopy(ir.persistence),
+        relationships=copy.deepcopy(ir.relationships),
+    )
+
+
+def verified_semantic_verification(canonical, source_preparation):
+    by_id = {x.requirement_id: x for x in source_preparation.requirement_irs}
     return RequirementSemanticVerificationBatch(requirements=[
-        RequirementSemanticVerificationItem(requirement_id=req.requirement_id, resolution=SemanticResolution.VERIFIED)
+        RequirementSemanticVerificationItem(
+            requirement_id=req.requirement_id,
+            resolution=SemanticResolution.VERIFIED,
+            independent_semantics=verification_fingerprint_from_ir(by_id[req.requirement_id]),
+        )
         for req in canonical.requirements
     ])
 
 
-def mismatch_semantic_verification(canonical, requirement_id, source_span):
+def mismatch_semantic_verification(canonical, source_preparation, requirement_id, source_span):
+    by_id = {x.requirement_id: x for x in source_preparation.requirement_irs}
     items = []
     for req in canonical.requirements:
+        kwargs = dict(
+            requirement_id=req.requirement_id,
+            independent_semantics=verification_fingerprint_from_ir(by_id[req.requirement_id]),
+        )
         if req.requirement_id == requirement_id:
             items.append(RequirementSemanticVerificationItem(
-                requirement_id=req.requirement_id,
+                **kwargs,
                 resolution=SemanticResolution.PARTIALLY_RESOLVED,
                 missing_or_misrepresented_source_spans=[source_span],
             ))
         else:
-            items.append(RequirementSemanticVerificationItem(requirement_id=req.requirement_id, resolution=SemanticResolution.VERIFIED))
+            items.append(RequirementSemanticVerificationItem(**kwargs, resolution=SemanticResolution.VERIFIED))
     return RequirementSemanticVerificationBatch(requirements=items)
 
 
@@ -359,8 +383,9 @@ def test_v081_tc12_semantic_preparation_is_bounded_for_8k_fast_context():
 def test_v081_independent_verifier_flags_silent_condition_omission():
     raw = (FIX / "TEST-012.txt").read_text(encoding="utf-8")
     canonical = DeterministicCaseParser(language_interval_parsing_enabled=False).parse(raw)
-    verification = mismatch_semantic_verification(canonical, "REQ-1201", "If IgnitionState is ON")
-    issues = RCAPipeline._semantic_verification_issues(canonical, verification)
+    source_prep = tc12_preparation(canonical)
+    verification = mismatch_semantic_verification(canonical, source_prep, "REQ-1201", "If IgnitionState is ON")
+    issues = RCAPipeline._semantic_verification_issues(canonical, source_prep, verification)
     assert len(issues) == 1
     assert issues[0].requirement_id == "REQ-1201"
     assert issues[0].material_to_compliance is True
@@ -396,7 +421,7 @@ def test_v080_clean_tc17_pipeline_uses_one_semantic_prep_and_zero_27b_calls():
     prep = tc17_preparation(canonical)
     assert not SemanticIntegrityChecker.material_issues(SemanticIntegrityChecker.validate(canonical, prep))
     req_batch, ev_batch = split_semantic_preparation(prep)
-    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical)], model="4b")
+    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical, prep)], model="4b")
     primary = FakeStructuredClient([], model="27b")
     pipeline = RCAPipeline(
         primary,
@@ -430,8 +455,8 @@ def test_v080_material_semantic_defect_triggers_exactly_one_batched_27b_arbitrat
     fast = FakeStructuredClient([
         bad_req_batch,
         bad_ev_batch,
-        mismatch_semantic_verification(canonical, "REQ-1701", "ServiceMode is not ACTIVE"),
-        verified_semantic_verification(canonical),
+        mismatch_semantic_verification(canonical, clean, "REQ-1701", "ServiceMode is not ACTIVE"),
+        verified_semantic_verification(canonical, clean),
     ], model="4b")
     primary = FakeStructuredClient([arbitration], model="27b")
     pipeline = RCAPipeline(
@@ -474,7 +499,7 @@ def test_v082_rca_context_or_output_symptom_does_not_trigger_27b_rca():
         )],
     ))
     req_batch, ev_batch = split_semantic_preparation(prep)
-    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical)], model="4b")
+    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical, prep)], model="4b")
     primary = FakeStructuredClient([], model="27b")
     pipeline = RCAPipeline(
         primary, semantic_preparation_client=fast, semantic_preparation_enabled=True,
@@ -499,7 +524,7 @@ def test_v082_explicit_mechanism_role_can_trigger_one_27b_rca_call():
         diagnostic_evidence_ids=[], hypotheses=[], case_validity_needs=[],
     )
     req_batch, ev_batch = split_semantic_preparation(prep)
-    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical)], model="4b")
+    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical, prep)], model="4b")
     primary = FakeStructuredClient([synthesis], model="27b")
     pipeline = RCAPipeline(
         primary, semantic_preparation_client=fast, semantic_preparation_enabled=True,
@@ -606,7 +631,7 @@ def test_v083_structural_completion_uses_fast_recompile_before_27b():
         bad_req_batch,
         repaired_batch,
         bad_ev_batch,
-        verified_semantic_verification(canonical),
+        verified_semantic_verification(canonical, clean),
     ], model="4b")
     primary = FakeStructuredClient([], model="27b")
     pipeline = RCAPipeline(
@@ -712,7 +737,7 @@ def test_v084_small_case_pipeline_always_splits_requirement_and_evidence_calls()
     canonical = DeterministicCaseParser(language_interval_parsing_enabled=False).parse(raw)
     prep = tc17_preparation(canonical)
     req_batch, ev_batch = split_semantic_preparation(prep)
-    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical)], model="4b")
+    fast = FakeStructuredClient([req_batch, ev_batch, verified_semantic_verification(canonical, prep)], model="4b")
     primary = FakeStructuredClient([], model="27b")
     pipeline = RCAPipeline(
         primary,
@@ -752,7 +777,7 @@ def test_v084_targeted_evidence_completion_repairs_scope_without_recompiling_req
         bad_req_batch,
         bad_ev_batch,
         repaired_ev,
-        verified_semantic_verification(canonical),
+        verified_semantic_verification(canonical, clean),
     ], model="4b")
     primary = FakeStructuredClient([], model="27b")
     pipeline = RCAPipeline(
@@ -784,4 +809,67 @@ def test_v084_release_docs_are_packaged_in_source_tree():
     assert (root / "CHANGELOG.md").exists()
     history = (root / "VERSION_HISTORY.md").read_text(encoding="utf-8")
     assert "## v0.8.3 → v0.8.4" in history
-    assert "Current release:** v1.8.5" in history
+    assert "Current release:** v1.8.6" in history
+
+
+def test_v085_verifier_structured_fingerprint_catches_live_tc17_boolean_regrouping_even_when_marked_verified():
+    raw = (FIX / "TEST-017.txt").read_text(encoding="utf-8")
+    canonical = DeterministicCaseParser(language_interval_parsing_enabled=False).parse(raw)
+    source = tc17_preparation(canonical)
+    candidate = source.model_copy(deep=True)
+    # Exact live failure shape: source A AND (B OR C) AND D was compiled as
+    # A AND [B AND (C OR D)].  Prose looked correct and the old verifier said VERIFIED.
+    a, or_bc, d = source.requirement_irs[0].condition.children
+    b, c = or_bc.children
+    candidate.requirement_irs[0].condition = LogicExpression(
+        kind=LogicKind.AND,
+        children=[
+            copy.deepcopy(a),
+            LogicExpression(
+                kind=LogicKind.AND,
+                children=[
+                    copy.deepcopy(b),
+                    LogicExpression(kind=LogicKind.OR, children=[copy.deepcopy(c), copy.deepcopy(d)]),
+                ],
+            ),
+        ],
+    )
+    verification = verified_semantic_verification(canonical, source)
+    # Intentionally keep resolution VERIFIED to prove Python compares the
+    # independent structured reconstruction, not the verifier's label/prose.
+    issues = RCAPipeline._semantic_verification_issues(canonical, candidate, verification)
+    req1 = [x for x in issues if x.requirement_id == "REQ-1701"]
+    assert len(req1) == 1
+    assert "condition" in req1[0].description
+    assert req1[0].material_to_compliance is True
+
+
+def test_v085_arbitration_rejects_live_tc17_notes_only_compliance_evidence_pseudo_repair():
+    ann = EvidenceSemanticAnnotation(
+        evidence_id="EVID-TC17",
+        resolution=SemanticResolution.VERIFIED,
+        facts=[EvidenceSemanticFact(
+            fact_id="F-TC17",
+            source_phrase="ServiceMode remained INACTIVE throughout the complete evaluated interval.",
+            subject="",
+            operator=PredicateOperator.OTHER,
+            value="",
+            temporal_semantics=TemporalSemantics.OTHER,
+            scope=EvidenceScopeAnnotation(resolution=ScopeResolution.UNRESOLVED),
+            resolution=SemanticResolution.VERIFIED,
+            possible_roles=[EvidenceSemanticRole.APPLICABILITY],
+            related_requirement_ids=["REQ-1701"],
+            notes="ServiceMode is INACTIVE for the evaluated interval, therefore the condition is satisfied.",
+        )],
+    )
+    with pytest.raises(ValueError, match="temporal_semantics=OTHER"):
+        SemanticArbitrationResponse(evidence_annotations=[ann])
+
+
+def test_v085_evidence_prompt_constrains_live_invalid_operator_words_without_python_nlp_mapping():
+    from rca_app.prompts import EVIDENCE_ANNOTATION_V085_PROMPT
+    prompt = EVIDENCE_ANNOTATION_V085_PROMPT
+    for allowed in ("EQ", "NEQ", "LT", "LTE", "GT", "GTE", "PRESENT", "ABSENT", "OTHER"):
+        assert allowed in prompt
+    for rejected in ("HAS", "REACHES", "WAS", "CONTAINS"):
+        assert rejected in prompt

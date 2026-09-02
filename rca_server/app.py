@@ -11,10 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from rca_app import __version__
+from rca_app import RCA_CORE_VERSION, __version__
 from rca_app.model_gateway import ModelClientSpec, ModelGateway
 
-from .api_models import ConfigUpdateRequest, ModelTestRequest, RunCreateRequest, RunState, SessionLoadRequest, SessionSaveRequest
+from .api_models import ConfigUpdateRequest, ModelDiscoverRequest, ModelTestRequest, RunCreateRequest, RunState, SessionLoadRequest, SessionSaveRequest
 from .auth import AuthGuard
 from .backend_config import ApplicationConfig, BackendSettings, ConfigStore
 from .run_manager import RunManager, TERMINAL
@@ -74,6 +74,7 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
         return {
             "status": "ok",
             "backend_version": __version__,
+            "core_version": RCA_CORE_VERSION,
             "deployment": settings.deployment.type,
             "profile_name": settings.deployment.profile_name,
         }
@@ -82,8 +83,8 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
     async def system():
         return system_info.snapshot(storage.root)
 
-    def _model_spec(role: str, cfg: ApplicationConfig):
-        item = cfg.primary_model if role == "primary" else cfg.small_model
+    def _model_spec(role: str, cfg: ApplicationConfig, item_override=None):
+        item = item_override or (cfg.primary_model if role == "primary" else cfg.small_model)
         token = os.environ.get(item.api_token_env or "", "") if item.api_token_env else ""
         return ModelClientSpec(
             role=role,
@@ -101,12 +102,16 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
 
     def _capabilities(cfg: ApplicationConfig) -> dict[str, Any]:
         snap = system_info.snapshot(storage.root)
+        # v1.8.6 does not own the lifecycle of external LM Studio/llama.cpp/vLLM
+        # processes. Engine controls therefore remain visible as deployment
+        # metadata but are capability-disabled unless a future deployment
+        # adapter explicitly declares that the backend manages that setting.
         features = {
             "flash_attention": False,
             "tensor_split": False,
-            "gpu_offload": bool(snap.get("gpu_count")),
+            "gpu_offload": False,
             "parallel_inference": False,
-            "cpu_threads": True,
+            "cpu_threads": False,
             "batch_size": False,
             "eval_batch_size": False,
             "context_override": False,
@@ -136,6 +141,7 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
             "configured_models": configured,
             "auth_required": settings.deployment.auth_required,
             "storage_root": str(storage.root),
+            "environment_overrides": config_store.environment_overrides(),
         }
 
     @app.get("/api/v1/capabilities", dependencies=[Depends(auth)])
@@ -155,14 +161,42 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
                 out[role] = {"status": "UNAVAILABLE", "configured": item.model, "models": [], "error": str(exc)}
         return out
 
+    @app.post("/api/v1/models/discover", dependencies=[Depends(auth)])
+    async def discover_model(request: ModelDiscoverRequest):
+        cfg = config_store.load()
+        try:
+            spec = _model_spec(request.role, cfg, request.config)
+            catalog = gateway.model_catalog(spec)
+            return {
+                "role": request.role,
+                "status": "AVAILABLE",
+                "endpoint": request.config.endpoint,
+                "configured": request.config.model,
+                "models": [str(x.get("id")) for x in catalog if x.get("id")],
+                "catalog": catalog,
+            }
+        except Exception as exc:
+            return {
+                "role": request.role,
+                "status": "UNAVAILABLE",
+                "endpoint": request.config.endpoint,
+                "configured": request.config.model,
+                "models": [],
+                "catalog": [],
+                "error": str(exc),
+            }
+
     @app.post("/api/v1/models/test", dependencies=[Depends(auth)])
     async def test_model(request: ModelTestRequest):
         cfg = config_store.load()
+        item = request.config or (cfg.primary_model if request.role == "primary" else cfg.small_model)
         try:
-            ok, message = gateway.test_connection(_model_spec(request.role, cfg))
-            return {"role": request.role, "ok": ok, "message": message}
+            spec = _model_spec(request.role, cfg, item)
+            ok, message = gateway.test_connection(spec)
+            catalog = gateway.model_catalog(spec)
+            return {"role": request.role, "ok": ok, "message": message, "endpoint": item.endpoint, "model": item.model, "catalog": catalog}
         except Exception as exc:
-            return {"role": request.role, "ok": False, "message": str(exc)}
+            return {"role": request.role, "ok": False, "message": str(exc), "endpoint": item.endpoint, "model": item.model, "catalog": []}
 
     @app.get("/api/v1/config", dependencies=[Depends(auth)])
     async def get_config():

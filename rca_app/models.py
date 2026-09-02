@@ -734,9 +734,26 @@ class EvidenceAnnotationBatch(StrictModel):
     unresolved_case_semantics: List[str] = Field(default_factory=list)
 
 
+class RequirementSemanticFingerprint(StrictModel):
+    """Source-derived semantic structure reconstructed independently by the verifier.
+
+    Python compares this structured fingerprint with the compiler IR; Python does
+    not derive the fingerprint from natural-language requirement text.
+    """
+
+    normative_type: NormativeType = NormativeType.AMBIGUOUS
+    condition: Optional[LogicExpression] = None
+    trigger: Optional[RequirementEventIR] = None
+    required_behavior: Optional[RequirementBehaviorIR] = None
+    timing: Optional[RequirementTimingIR] = None
+    persistence: Optional[RequirementPersistenceIR] = None
+    relationships: List[RequirementRelationshipIR] = Field(default_factory=list)
+
+
 class RequirementSemanticVerificationItem(StrictModel):
     requirement_id: str
     resolution: SemanticResolution = SemanticResolution.VERIFIED
+    independent_semantics: RequirementSemanticFingerprint
     missing_or_misrepresented_source_spans: List[str] = Field(default_factory=list)
     notes: str = ""
 
@@ -865,11 +882,45 @@ class SemanticArbitrationResponse(StrictModel):
                     f"Arbitration evidence repair {ann.evidence_id} remains {ann.resolution.value}; "
                     "leave the blocking issue unresolved instead."
                 )
+            if not ann.facts:
+                raise ValueError(
+                    f"Arbitration evidence repair {ann.evidence_id} contains no executable facts; "
+                    "leave the blocking issue unresolved instead."
+                )
             for fact in ann.facts:
                 if fact.resolution != SemanticResolution.VERIFIED:
                     raise ValueError(
                         f"Arbitration evidence repair {ann.evidence_id}/{fact.fact_id} is not VERIFIED"
                     )
+                material_roles = {
+                    EvidenceSemanticRole.APPLICABILITY,
+                    EvidenceSemanticRole.TRIGGER,
+                    EvidenceSemanticRole.RESPONSE,
+                    EvidenceSemanticRole.TIMING,
+                }
+                material_to_compliance = bool(fact.related_requirement_ids) or bool(set(fact.possible_roles) & material_roles)
+                if material_to_compliance:
+                    if fact.temporal_semantics == TemporalSemantics.OTHER:
+                        raise ValueError(
+                            f"Arbitration evidence repair {ann.evidence_id}/{fact.fact_id} is linked to compliance "
+                            "but leaves temporal_semantics=OTHER"
+                        )
+                    if not fact.subject.strip():
+                        raise ValueError(
+                            f"Arbitration evidence repair {ann.evidence_id}/{fact.fact_id} is linked to compliance "
+                            "but has no structured subject"
+                        )
+                    if fact.temporal_semantics in {TemporalSemantics.POINT_STATE, TemporalSemantics.PERSISTENT_STATE}:
+                        if fact.operator == PredicateOperator.OTHER:
+                            raise ValueError(
+                                f"Arbitration evidence repair {ann.evidence_id}/{fact.fact_id} is a state fact "
+                                "without an executable operator"
+                            )
+                        if fact.operator not in {PredicateOperator.PRESENT, PredicateOperator.ABSENT} and not fact.value.strip() and fact.numeric_value is None:
+                            raise ValueError(
+                                f"Arbitration evidence repair {ann.evidence_id}/{fact.fact_id} is a state fact "
+                                "without a structured value"
+                            )
                 if fact.temporal_semantics == TemporalSemantics.PERSISTENT_STATE:
                     if fact.scope.resolution != ScopeResolution.RESOLVED or not fact.scope.scope_id.strip():
                         raise ValueError(

@@ -1,15 +1,15 @@
-# Home AI Server Deployment
+# Home AI Server Deployment — v1.8.6
 
-The home server uses the same application/container as Dell and RunPod.
+The home server uses the **same** v1.8.6 application/container as Dell and RunPod. No hardware-specific code fork is allowed.
 
-Primary changes are configuration only:
+Configuration differences are limited to:
 
-- deployment profile: `home-ai-server`;
+- deployment profile;
 - storage root;
-- primary/small model endpoints;
-- inference provider;
-- authentication/TLS endpoint;
-- hardware-specific model-server startup parameters.
+- Primary and Small / Utility endpoints/models;
+- Critical Semantic Model Routing;
+- authentication/TLS edge;
+- provider-specific model-server launch parameters.
 
 Example:
 
@@ -23,4 +23,6 @@ export RCA_SMALL_ENDPOINT='http://127.0.0.1:8002/v1'
 python run_web.py
 ```
 
-A dual-3090, single-3090 or future accelerator changes the inference service/profile, not the RCA application code.
+A dual-GPU or different accelerator changes inference-server configuration, not RCA semantics.
+
+As on RunPod, v1.8.6 does not own external model-server lifecycle. Set real context/offload/batching in the model server and use the Web UI for discovery, testing, role routing and reproducible per-run snapshots.

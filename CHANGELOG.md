@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.6
+
+- Promote application to **v1.8.6** with embedded **RCA Core v0.8.5 candidate**; v0.8.5 remains unfrozen pending live TC17/TC12 acceptance.
+- Preserve completed pipeline Stage Input/Output by merging repeated stage events instead of replacing prior state.
+- Persist structured stage input/output and render nested human-readable stage data with Raw JSON available for forensic inspection.
+- Restore full per-testcase result parity for sequential batches: Final Report, Validation, Canonical Input, Structured JSON, LLM Attempts, Repair Routing, pipeline/logs and statistics.
+- Publish batch results incrementally after each successful or failed testcase rather than only at batch completion.
+- Add per-testcase and per-stage statistics, including failed model calls, token/latency/retry/throughput data, role/model/endpoint breakdown and requirement-result counts.
+- Add endpoint-current model discovery/test (`POST /api/v1/models/discover`) so model selection no longer requires saving stale backend configuration first.
+- Expose active `RCA_*` deployment environment overrides instead of silently making saved model configuration appear to revert.
+- Add immutable per-run `config_override` snapshots from the current Web form.
+- Clarify that external llama.cpp/LM Studio/vLLM context/offload settings are server-managed unless a provider adapter explicitly owns process lifecycle.
+- Add Critical Semantic Model Routing so semantic preparation and independent verification can each use the configured Small / Utility or Primary model without changing RCA authority.
+- Harden the independent verifier with a source-derived structured semantic fingerprint; Python detects TC17-style Boolean regrouping even if the verifier label says `VERIFIED`.
+- Reject arbitration evidence pseudo-repairs that explain correct meaning only in notes while leaving compliance-linked facts non-executable (`OTHER`/missing subject/value/scope).
+- Tighten evidence annotation prompts to the legal schema enum; Python does not translate invented operators such as `HAS`, `REACHES`, `WAS`, or `CONTAINS`.
+- Preserve Python 3.9 backend compatibility, frozen evidence semantics, deterministic compliance authority and desktop fallback.
+- Add v1.8.6 live-failure-shape/application regressions and release documentation.
+- Release validation: **201 passed** in the working tree and **201 passed** from a clean fresh extraction.
+
 ## 1.8.5
 
 - Fixed FastAPI/Pydantic startup failure on Python 3.9 caused by runtime evaluation of PEP 604 annotations such as `str | None` in the new `rca_server` layer.

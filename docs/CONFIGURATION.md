@@ -1,20 +1,16 @@
-# v1.8.5 Configuration Reference
+# RCA Analyst v1.8.6 Configuration Reference
 
-## Deployment profile
-
-YAML under `configs/deployment/` controls backend bind/storage/security/capability declarations. Select with `RCA_DEPLOYMENT_PROFILE`.
-
-## Application configuration
+## Top-level application configuration
 
 Persisted under `<storage_root>/config/application.json`.
 
-Top-level sections:
-
 ### `rca`
 
-Preserves v0.8.4 `AppConfig` field names for semantic migration safety, including active and hidden compatibility settings.
+Retains existing `AppConfig` compatibility fields. The active semantic topology remains controlled by the established v0.8 switches/budgets; old v0.7-compatible fields are retained for deterministic round-trip migration.
 
-### `primary_model`
+### `primary_model` / `small_model`
+
+Each role contains:
 
 - `provider`
 - `endpoint`
@@ -28,11 +24,30 @@ Preserves v0.8.4 `AppConfig` field names for semantic migration safety, includin
 - `transport`
 - `api_token_env`
 
-### `small_model`
+`context_size` is expected/provider metadata in v1.8.6; it does not reconfigure an already-running external model server.
 
-Same independent fields for the 4B/small-model services.
+### `model_routing` — new in v1.8.6
+
+```json
+{
+  "semantic_preparation_role": "small",
+  "semantic_verification_role": "small",
+  "semantic_preparation_reasoning_effort": "provider_default",
+  "semantic_preparation_thinking_mode": "off",
+  "semantic_verification_reasoning_effort": "provider_default",
+  "semantic_verification_thinking_mode": "off"
+}
+```
+
+Allowed roles are `small` and `primary`.
+
+- semantic preparation role owns Requirement IR compilation, structural semantic completion, evidence annotation and targeted evidence completion;
+- semantic verification role owns the independent original-requirement vs candidate-IR verifier, including post-arbitration verification;
+- changing these fields changes model capacity/transport only. Python retains deterministic compliance authority.
 
 ### `inference`
+
+Fields remain preserved:
 
 - `cpu_threads`
 - `gpu_layers`
@@ -45,9 +60,11 @@ Same independent fields for the 4B/small-model services.
 - `context_size_override`
 - `provider_options`
 
-Unsupported active parameters are rejected with HTTP 422; the Web UI capability-gates them first.
+Important v1.8.6 behavior: the FastAPI backend does not currently own external LM Studio/llama.cpp/vLLM process lifecycle. Consequently these controls are capability-disabled unless a deployment adapter explicitly advertises backend ownership. They must not imply that editing the Web form changes `llama-server -c`, GPU layers, Flash Attention, etc.
 
 ## Environment overrides
+
+Deployment variables include:
 
 - `RCA_DEPLOYMENT_PROFILE`
 - `RCA_STORAGE_ROOT`
@@ -60,6 +77,18 @@ Unsupported active parameters are rejected with HTTP 422; the Web UI capability-
 - `RCA_SMALL_MODEL`
 - `RCA_PRIMARY_PROVIDER`
 - `RCA_SMALL_PROVIDER`
-- `LM_API_TOKEN` (default model-server token environment variable)
+- model API-token environment variables such as `LM_API_TOKEN`.
 
-Environment endpoint/model overrides apply at deployment runtime and do not rewrite RCA core behavior.
+The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.6 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
+
+A Web-started run additionally supplies the current form through `config_override`. That run snapshot is authoritative for that run and is persisted in `config_snapshot.json`/session metadata.
+
+## Context-size rule
+
+There are three distinct concepts:
+
+1. model training maximum (provider/model metadata);
+2. actual server runtime context, e.g. llama.cpp `-c 8192`;
+3. RCA configuration metadata/expectation.
+
+Only (2) controls the running server's real context window. v1.8.6 model discovery displays provider-advertised runtime context when available so mismatches are visible.

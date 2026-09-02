@@ -207,8 +207,11 @@ class RunManager:
     def _execute_case_sequence(self, runtime: RuntimeRun, cases: list[tuple[str, str]], expectations: dict[str, Any]) -> None:
         records = []
         total = len(cases)
+        runtime.result = {"run_type": runtime.request.run_type, "cases": records, "count": 0, "total_cases": total}
+        self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
         for index, (case_id, raw) in enumerate(cases, start=1):
             runtime.cancellation.throw_if_cancelled(f"before batch case {case_id}")
+            case_started = time.perf_counter()
             self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: STARTED")
             pipeline = self.pipeline_factory.build(runtime.config, runtime.cancellation)
             runtime.pipeline = pipeline
@@ -224,21 +227,60 @@ class RunManager:
                 self.storage.write_text(f"{case_dir}/report.md", result.final_report)
                 expected = expectations.get(case_id)
                 acceptance = evaluate_semantic_acceptance(result, expected) if expected else None
-                records.append({
+                self._capture_model_metrics(runtime, payload, case_id=case_id)
+                record = {
                     "case_id": case_id,
                     "execution_status": "PASS",
                     "semantic_acceptance": acceptance.model_dump(mode="json") if hasattr(acceptance, "model_dump") else acceptance,
                     "result": payload,
-                })
-                self._capture_model_metrics(runtime, payload, case_id=case_id)
+                }
             except PipelineValidationError as exc:
                 failure = self._failure_payload(str(exc), exc.validated, exc.canonical_case, exc.attempts, exc.stats, exc.repair_log)
                 self.storage.write_json(f"runs/{runtime.summary.run_id}/cases/{case_id}/failure.json", failure)
-                records.append({"case_id": case_id, "execution_status": "FAILED", "semantic_acceptance": "NOT_EVALUATED", "failure": failure})
+                self._capture_model_metrics(runtime, failure, case_id=case_id)
+                record = {"case_id": case_id, "execution_status": "FAILED", "semantic_acceptance": "NOT_EVALUATED", "failure": failure}
             finally:
                 runtime.pipeline = None
-        runtime.result = {"run_type": runtime.request.run_type, "cases": records, "count": len(records)}
-        self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+            record["statistics"] = self._case_statistics(runtime, case_id, round(time.perf_counter() - case_started, 6), record)
+            records.append(record)
+            runtime.result = {"run_type": runtime.request.run_type, "cases": records, "count": len(records), "total_cases": total}
+            self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
+            self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: {record['execution_status']}")
+
+    def _case_statistics(self, runtime: RuntimeRun, case_id: str, elapsed_seconds: float, record: dict[str, Any]) -> dict[str, Any]:
+        calls = [x for x in runtime.metrics.get("model_calls", []) if x.get("case_id") == case_id]
+        prompt = sum(int(x.get("prompt_tokens") or 0) for x in calls)
+        completion = sum(int(x.get("completion_tokens") or 0) for x in calls)
+        reasoning = sum(int(x.get("reasoning_tokens") or 0) for x in calls)
+        model_seconds = sum(float(x.get("request_duration_seconds") or 0.0) for x in calls)
+        by_model_role: dict[str, dict[str, Any]] = {}
+        for call in calls:
+            key = call.get("model_role") or "UNSPECIFIED"
+            row = by_model_role.setdefault(key, {"calls": 0, "seconds": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "reasoning_tokens": 0})
+            row["calls"] += 1
+            row["seconds"] += float(call.get("request_duration_seconds") or 0.0)
+            row["prompt_tokens"] += int(call.get("prompt_tokens") or 0)
+            row["completion_tokens"] += int(call.get("completion_tokens") or 0)
+            row["reasoning_tokens"] += int(call.get("reasoning_tokens") or 0)
+        req_counts: dict[str, int] = {}
+        payload = record.get("result") or {}
+        for row in ((payload.get("validated") or {}).get("requirement_results") or []):
+            status = str(row.get("evaluation_status") or "UNKNOWN")
+            req_counts[status] = req_counts.get(status, 0) + 1
+        return {
+            "elapsed_seconds": elapsed_seconds,
+            "model_seconds": round(model_seconds, 6),
+            "python_seconds_estimate": round(max(elapsed_seconds - model_seconds, 0.0), 6),
+            "model_calls": len(calls),
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "reasoning_tokens": reasoning,
+            "total_tokens": prompt + completion,
+            "weighted_generation_tokens_per_second": round(completion / model_seconds, 3) if model_seconds > 0 else None,
+            "retries": sum(int(x.get("retries") or 0) for x in calls),
+            "by_model_role": by_model_role,
+            "requirement_result_counts": req_counts,
+        }
 
     @staticmethod
     def _failure_payload(message, validated, canonical, attempts, stats, repair_log):
@@ -316,17 +358,26 @@ class RunManager:
             if status != "RUNNING" and not start:
                 start = now
             end = now if status in {"COMPLETE", "FAILED", "SKIPPED", "ATTENTION", "CANCELLED"} else None
+            new_metadata = {k: v for k, v in event.items() if k not in {"stage_id", "title", "status", "summary", "input_text", "output_text", "input_data", "output_data"}}
+            merged_metadata = dict(previous.metadata) if previous else {}
+            merged_metadata.update(new_metadata)
+            input_text = str(event.get("input_text") or "") or (previous.input_text if previous else "")
+            output_text = str(event.get("output_text") or "") or (previous.output_text if previous else "")
+            input_data = event.get("input_data") if event.get("input_data") is not None else (previous.input_data if previous else None)
+            output_data = event.get("output_data") if event.get("output_data") is not None else (previous.output_data if previous else None)
             stage = PipelineStage(
                 stage_id=stage_id,
-                name=str(event.get("title") or stage_id),
+                name=str(event.get("title") or (previous.name if previous else stage_id)),
                 status=status,
-                summary=str(event.get("summary") or ""),
+                summary=str(event.get("summary") or (previous.summary if previous else "")),
                 start_time=start,
                 end_time=end,
                 elapsed_ms=_elapsed_ms(start, end),
-                input_text=str(event.get("input_text") or ""),
-                output_text=str(event.get("output_text") or ""),
-                metadata={k: v for k, v in event.items() if k not in {"stage_id", "title", "status", "summary", "input_text", "output_text"}},
+                input_text=input_text,
+                output_text=output_text,
+                input_data=input_data,
+                output_data=output_data,
+                metadata=merged_metadata,
             )
             runtime.stages[stage_id] = stage
             self._event(runtime, "pipeline_stage", stage.model_dump(mode="json"))
@@ -356,13 +407,19 @@ class RunManager:
             elapsed = float(stat.get("elapsed_seconds") or 0)
             completion = int(stat.get("completion_tokens") or 0)
             attempt = by_call.get(idx, {})
+            attempt_stage = attempt.get("stage", "")
+            endpoint = stat.get("endpoint", "")
+            provider = runtime.config.primary_model.provider if endpoint.rstrip("/") == runtime.config.primary_model.endpoint.rstrip("/") else runtime.config.small_model.provider
+            stage_id = self._metric_stage_id(case_id, attempt_stage)
             runtime.metrics["model_calls"].append({
                 "case_id": case_id,
                 "call_index": idx,
-                "stage": attempt.get("stage", ""),
+                "stage": attempt_stage,
+                "stage_id": stage_id,
                 "model_role": attempt.get("model_role", ""),
                 "model": stat.get("model", ""),
-                "provider": runtime.config.primary_model.provider if stat.get("model") == runtime.config.primary_model.model else runtime.config.small_model.provider,
+                "endpoint": endpoint,
+                "provider": provider,
                 "prompt_tokens": int(stat.get("prompt_tokens") or 0),
                 "completion_tokens": completion,
                 "reasoning_tokens": int(stat.get("reasoning_tokens") or 0),
@@ -376,10 +433,65 @@ class RunManager:
                 "retries": int(stat.get("retries") or 0),
                 "transport": attempt.get("transport", ""),
             })
+        # Keep per-stage metrics useful during active/reconnectable runs, not only
+        # after terminal finalization.  This is observational and never affects RCA logic.
+        self._attach_stage_statistics(runtime)
+        self._persist(runtime)
+
+    @staticmethod
+    def _metric_stage_id(case_id: str, attempt_stage: str) -> str:
+        stage = attempt_stage or ""
+        if stage.startswith("semantic_preparation_requirements_"):
+            try:
+                n = int(stage.rsplit("_", 1)[1])
+                base = f"06_req_{n:02d}"
+            except Exception:
+                base = "06_semantic_preparation"
+        else:
+            mapping = {
+                "semantic_structural_completion": "06a_structural_ir_completion",
+                "semantic_preparation_evidence": "06b_evidence_annotation",
+                "semantic_evidence_completion": "06c_evidence_completion",
+                "semantic_verification": "06d_semantic_verification",
+                "semantic_arbitration": "08_semantic_arbitration",
+                "semantic_verification_post_arbitration": "08b_post_arbitration_verification",
+                "rca_synthesis": "12_rca_synthesis",
+                "fast_hypothesis_review": "13_hypothesis_review",
+                "final_review": "14_wording_review",
+                "fast_source_availability": "03_source_availability",
+                "fast_content_classification": "04_content_classification",
+                "fast_atomic_claims": "06_atomic_claims",
+                "fast_requirement_language": "07_requirement_language",
+            }
+            base = mapping.get(stage, stage)
+        return f"{case_id}:{base}" if case_id else base
+
+    def _attach_stage_statistics(self, runtime: RuntimeRun) -> None:
+        by_stage: dict[str, list[dict[str, Any]]] = {}
+        for call in runtime.metrics.get("model_calls", []):
+            by_stage.setdefault(call.get("stage_id") or "", []).append(call)
+        for stage_id, stage in runtime.stages.items():
+            calls = by_stage.get(stage_id, [])
+            seconds = sum(float(x.get("request_duration_seconds") or 0.0) for x in calls)
+            completion = sum(int(x.get("completion_tokens") or 0) for x in calls)
+            stage.metadata["statistics"] = {
+                "elapsed_seconds": round(float(stage.elapsed_ms or 0.0) / 1000.0, 6),
+                "model_call_count": len(calls),
+                "model_seconds": round(seconds, 6),
+                "prompt_tokens": sum(int(x.get("prompt_tokens") or 0) for x in calls),
+                "completion_tokens": completion,
+                "reasoning_tokens": sum(int(x.get("reasoning_tokens") or 0) for x in calls),
+                "total_tokens": sum(int(x.get("total_tokens") or 0) for x in calls),
+                "retries": sum(int(x.get("retries") or 0) for x in calls),
+                "weighted_generation_tokens_per_second": round(completion / seconds, 3) if seconds > 0 else None,
+                "models": sorted({str(x.get("model") or "") for x in calls if x.get("model")}),
+                "endpoints": sorted({str(x.get("endpoint") or "") for x in calls if x.get("endpoint")}),
+            }
 
     def _finalize_metrics(self, runtime: RuntimeRun) -> None:
         runtime.metrics["system_end"] = self.system_info.snapshot(self.storage.root)
         runtime.metrics["status"] = runtime.summary.status.value
+        self._attach_stage_statistics(runtime)
         runtime.metrics["started_at"] = runtime.summary.started_at
         runtime.metrics["finished_at"] = runtime.summary.finished_at
         runtime.metrics["pipeline"] = {k: v.model_dump(mode="json") for k, v in runtime.stages.items()}
