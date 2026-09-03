@@ -1,4 +1,4 @@
-# RunPod Deployment Guide — v1.8.12
+# RunPod Deployment Guide — v1.8.13
 
 ## Persistent layout
 
@@ -29,7 +29,7 @@ Model IDs may be provided by environment defaults or current Web form/run config
 
 ## Model-server launch parameters
 
-v1.8.12 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
+v1.8.13 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
 
 Example llama.cpp pattern:
 
@@ -53,7 +53,7 @@ For llama.cpp, inspect returned `n_ctx`.
 
 ## Critical Semantic Model Routing
 
-v1.8.12 can route critical semantic work without killing servers or patching code:
+v1.8.13 can route critical semantic work without killing servers or patching code:
 
 - Semantic Preparation → Small / Utility or Primary
 - Semantic Verification → Small / Utility or Primary
@@ -118,11 +118,11 @@ When a critical role uses Thinking Off, v1.8.7 sends `chat_template_kwargs.enabl
 
 For the next live acceptance run, keep the same stable 27B physical routing used by the successful v1.8.10 full suite. TC12 and TC17 are already live-confirmed anchors; rerun the complete bundle without testcase-specific setting changes.
 
-## v1.8.11 live full-suite validation
+## v1.8.13 live full-suite validation
 
 Deploy the exact release ZIP and keep model-server context/routing/reasoning settings stable for the complete batch. Export the full run bundle after completion. Semantic acceptance must be assessed independently from transport execution status.
 
-Watch especially for TEST-007/015/016/018/019/021, verifier structured retries, canonical persistence-scope outputs, arbitration redundant-field diagnostics, companion source-clause repairs, RCA packet direct-observation closure, final semantic-integrity ERROR count and hypothesis acceptance. RCA Core v0.8.10 stays candidate until exact-package live acceptance succeeds.
+Watch especially for TEST-004/009/019, explicit verifier target fields, partial structural/arbitration repair admission, correlated RCA snapshot closure, absence of historical IDs from deterministic compliance evidence, final semantic-integrity ERROR count and hypothesis acceptance. RCA Core v0.8.11 stays candidate until exact-package live acceptance succeeds.
 
 
 ## v1.8.9 reconnect note
@@ -130,5 +130,5 @@ Watch especially for TEST-007/015/016/018/019/021, verifier structured retries, 
 If the browser tab is closed while a run continues, reconnect/authenticate to the same backend. The Web client will rediscover the active run from `/runs` and resume live polling. Restarting the backend process is different: the lost worker cannot be resumed and partial artifacts remain preserved as an interrupted run.
 
 
-### v1.8.12 model-server check
+### v1.8.12+ model-server check
 Use **Discover at Endpoint** after starting or changing an external model server. An empty loaded-model catalog is now an explicit error state. Use **Test Model** to run a minimal inference probe before starting a long RCA suite; the discovered runtime context is shown when the provider exposes it.

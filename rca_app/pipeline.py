@@ -36,6 +36,7 @@ from .models import (
     SourceAvailabilityNormalization,
     SemanticPreparation,
     RequirementCompilationBatch,
+    RequirementStructuralPatch,
     RequirementStructuralPatchBatch,
     EvidenceAnnotationBatch,
     RequirementSemanticVerificationBatch,
@@ -96,7 +97,7 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.10 adaptive semantic-compiler RCA architecture.
+    """v0.8.11 adaptive semantic-compiler RCA architecture.
 
     Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
@@ -618,9 +619,13 @@ class RCAPipeline:
                     "SEMANTIC_STRUCTURAL_COMPLETION",
                     structural_response,
                 ))
-                self._validate_structural_patches(structural_response.parsed, targets)
+                admitted_batch, admission_notes = self._admit_structural_patches(
+                    structural_response.parsed, targets
+                )
+                if admission_notes:
+                    attempts[-1].retry_diagnostics.extend(admission_notes)
                 semantic_preparation = self._apply_structural_patches(
-                    semantic_preparation, structural_response.parsed, targets
+                    semantic_preparation, admitted_batch, targets
                 )
                 structural_issues = self.semantic_integrity_checker.structural_requirement_issues(
                     semantic_preparation
@@ -630,7 +635,9 @@ class RCAPipeline:
                     "attention" if structural_issues else "complete",
                     f"Structural completion pass {structural_pass} finished; {len(structural_issues)} structured defect(s) remain.",
                     output_value={
-                        "patches": structural_response.parsed,
+                        "raw_patches": structural_response.parsed,
+                        "admitted_patches": admitted_batch,
+                        "admission_notes": admission_notes,
                         "remaining_issues": [x.model_dump(mode="json") for x in structural_issues],
                         "model_call": structural_response.stats,
                         "finish_reason": structural_response.finish_reason,
@@ -897,7 +904,7 @@ class RCAPipeline:
                     system_prompt=SEMANTIC_ARBITRATION_PROMPT,
                     user_prompt=arb_prompt,
                     response_model=SemanticArbitrationResponse,
-                    schema_name="rca_semantic_arbitration_v0810",
+                    schema_name="rca_semantic_arbitration_v0811",
                 )
                 stats.append(arb_response.stats)
                 attempts.append(self._make_aux_attempt(len(attempts)+1, "semantic_arbitration", "PRIMARY_SEMANTIC_ARBITRATION", arb_response))
@@ -908,6 +915,12 @@ class RCAPipeline:
                     )
                     if arbitration_contract_notes:
                         attempts[-1].retry_diagnostics.extend(arbitration_contract_notes)
+                    if not self._arbitration_has_admissible_progress(
+                        semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets, semantic_preparation
+                    ):
+                        raise ValueError(
+                            "Arbitration returned no admissible targeted repair fields; current semantics are retained unresolved."
+                        )
                     semantic_preparation = self.semantic_arbitration_merger.apply(
                         semantic_preparation, semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets
                     )
@@ -1139,9 +1152,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.10 analysis is ready for session export.",
+                         "Validated v0.8.11 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.10 analysis completed.")
+        progress("Complete", "v0.8.11 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1292,6 +1305,10 @@ class RCAPipeline:
     def _structural_completion_targets(cls, preparation: SemanticPreparation, issues) -> dict[str, list[str]]:
         by_id = {x.requirement_id: x for x in preparation.requirement_irs}
         targets: dict[str, set[str]] = {}
+        supported_fields = {
+            "normative_type", "condition", "trigger", "required_behavior",
+            "timing", "persistence", "relationships", "source_clauses",
+        }
         for issue in issues:
             ir = by_id.get(issue.requirement_id)
             if ir is None:
@@ -1299,6 +1316,16 @@ class RCAPipeline:
             sid = issue.semantic_id
             description = issue.description
             fields: set[str] = set()
+
+            # When an upstream structured verifier already supplied exact target
+            # fields, those fields are authoritative.  Do not mine the human-
+            # readable description for additional field names: TEST-019 showed
+            # that explanatory prose such as "trigger and timing are correct"
+            # otherwise creates false repair targets.
+            explicit = set(getattr(issue, "target_fields", []) or []) & supported_fields
+            if explicit:
+                targets.setdefault(ir.requirement_id, set()).update(explicit)
+                continue
 
             # Provenance/audit defects are explicit structural targets.  The
             # patch replaces the complete source-clause inventory; Python does
@@ -1461,6 +1488,71 @@ class RCAPipeline:
             raise ValueError(
                 "Structural completion omitted required requirement patches: " + ", ".join(sorted(missing_requirements))
             )
+
+    @staticmethod
+    def _admit_structural_patches(
+        batch: RequirementStructuralPatchBatch,
+        targets: dict[str, list[str]],
+    ) -> tuple[RequirementStructuralPatchBatch, list[str]]:
+        """Admit safe targeted progress from a partial structural-completion response.
+
+        A model omission must not discard unrelated valid targeted fields.  Only
+        explicitly targeted, non-null fields are copied into the admitted batch.
+        A patch that attempts any untargeted semantic field is ignored as a whole
+        for that requirement, while unrelated requirement patches remain usable.
+        Missing fields stay unresolved and are rediscovered by the next bounded
+        structural-integrity pass.
+        """
+        allowed_patch_fields = {
+            "condition", "trigger", "required_behavior", "timing",
+            "persistence", "source_clauses",
+        }
+        accepted: list[RequirementStructuralPatch] = []
+        notes: list[str] = []
+        seen: set[str] = set()
+
+        for patch in batch.patches:
+            rid = patch.requirement_id
+            if rid not in targets:
+                notes.append(f"Ignored untargeted structural patch for {rid}.")
+                continue
+            if rid in seen:
+                notes.append(f"Ignored duplicate structural patch for {rid}.")
+                continue
+            seen.add(rid)
+            supplied = {
+                name for name in allowed_patch_fields
+                if name in patch.model_fields_set and getattr(patch, name) is not None
+            }
+            expected = set(targets[rid])
+            unexpected = supplied - expected
+            if unexpected:
+                notes.append(
+                    f"Rejected structural patch for {rid} because it attempted untargeted fields: "
+                    f"{sorted(unexpected)}."
+                )
+                continue
+
+            admitted_fields = supplied & expected
+            if admitted_fields:
+                payload = {"requirement_id": rid}
+                for field in admitted_fields:
+                    payload[field] = copy.deepcopy(getattr(patch, field))
+                accepted.append(RequirementStructuralPatch(**payload))
+                notes.append(
+                    f"Admitted structural progress for {rid}: {sorted(admitted_fields)}."
+                )
+
+            missing = expected - supplied
+            if missing:
+                notes.append(
+                    f"Structural completion left fields unresolved for {rid}: {sorted(missing)}."
+                )
+
+        for rid in sorted(set(targets) - seen):
+            notes.append(f"Structural completion omitted the patch for {rid}; all target fields remain unresolved.")
+
+        return RequirementStructuralPatchBatch(patches=accepted), notes
 
     @staticmethod
     def _apply_structural_patches(preparation: SemanticPreparation, batch: RequirementStructuralPatchBatch, targets: dict[str, list[str]]) -> SemanticPreparation:
@@ -1819,10 +1911,11 @@ class RCAPipeline:
     ) -> list[str]:
         """Validate one issue-scoped arbitration response before any merge.
 
-        Existing IRs are repaired atomically by field patch. Full RequirementIR
-        replacement is reserved for a requirement for which the compiler returned
-        no candidate at all. Every targeted field must be supplied or explicitly
-        left unresolved; partial silent repair is rejected.
+        Existing IRs are repaired only through Python-approved field patches.
+        Full RequirementIR replacement is reserved for a requirement for which
+        the compiler returned no candidate at all. Safe targeted fields may make
+        partial progress: an omitted sibling field remains unresolved and is
+        caught again by semantic integrity instead of discarding valid repairs.
         """
         issue_ids = {x.issue_id for x in material_issues}
         unknown_unresolved = set(response.unresolved_issue_ids) - issue_ids
@@ -1898,27 +1991,34 @@ class RCAPipeline:
                 raise ValueError(f"Arbitration patch attempted changed untargeted fields for {rid}: {sorted(changed_untargeted)}")
             supplied = supplied - unexpected
             missing = expected - supplied
-            invalid_missing = set()
-            for field in missing:
+            for field in sorted(missing):
                 governed = field_issue_ids(rid, field)
-                if not (governed and governed.issubset(unresolved)):
-                    invalid_missing.add(field)
-            if invalid_missing:
-                raise ValueError(
-                    f"Arbitration patch omitted targeted fields for {rid}: {sorted(invalid_missing)}; "
-                    "each omitted field must have all governing material issue IDs explicitly listed in unresolved_issue_ids"
-                )
+                if governed and governed.issubset(unresolved):
+                    contract_notes.append(
+                        f"Arbitration explicitly left {rid}.{field} unresolved via issue IDs {sorted(governed)}."
+                    )
+                else:
+                    contract_notes.append(
+                        f"Arbitration omitted targeted field {rid}.{field}; valid sibling repairs are admitted and this field remains unresolved."
+                    )
 
-        # A targeted existing requirement may omit a field patch only when a
-        # legacy full IR supplies the target fields or all current material
-        # issues are explicitly kept unresolved.
+        # A targeted existing requirement may omit its patch entirely. This does
+        # not authorize any semantic default; the current IR is retained and the
+        # unresolved defect is rediscovered by the post-arbitration integrity
+        # pass. Legacy full IRs may still supply Python-approved target fields.
         legacy_full_ids = {x.requirement_id for x in response.requirement_irs}
         for rid in requirement_targets:
             if rid in seen_patches or rid in legacy_full_ids:
                 continue
             req_issues = issues_by_req.get(rid, set())
-            if not req_issues or not req_issues.issubset(unresolved):
-                raise ValueError(f"Arbitration omitted required field patch for {rid}")
+            if req_issues and req_issues.issubset(unresolved):
+                contract_notes.append(
+                    f"Arbitration explicitly left all targeted semantics unresolved for {rid}."
+                )
+            else:
+                contract_notes.append(
+                    f"Arbitration omitted the targeted patch for {rid}; current IR is retained and issues remain unresolved."
+                )
 
         seen_full = set()
         for ir in response.requirement_irs:
@@ -1933,7 +2033,9 @@ class RCAPipeline:
                     raise ValueError(f"Arbitration returned full IR for existing requirement without field targets: {rid}")
                 missing = [f for f in requirement_targets[rid] if not hasattr(ir, f) or getattr(ir, f) is None]
                 if missing:
-                    raise ValueError(f"Arbitration legacy full IR omitted targeted fields for {rid}: {missing}")
+                    contract_notes.append(
+                        f"Arbitration legacy full IR omitted targeted fields for {rid}: {missing}; supplied target fields may still make progress."
+                    )
                 # Count this as a supplied repair. The merger will still copy
                 # only the Python-approved target fields, never the full IR.
                 seen_patches.add(rid)
@@ -1959,9 +2061,41 @@ class RCAPipeline:
             if eid in seen_evidence:
                 continue
             ev_issues = issues_by_evidence.get(eid, set())
-            if not ev_issues or not ev_issues.issubset(unresolved):
-                raise ValueError(f"Arbitration omitted targeted evidence replacement for {eid}")
+            if ev_issues and ev_issues.issubset(unresolved):
+                contract_notes.append(
+                    f"Arbitration explicitly left targeted evidence unresolved for {eid}."
+                )
+            else:
+                contract_notes.append(
+                    f"Arbitration omitted targeted evidence replacement for {eid}; current evidence semantics are retained unresolved."
+                )
         return contract_notes
+
+    @staticmethod
+    def _arbitration_has_admissible_progress(
+        response: SemanticArbitrationResponse,
+        requirement_targets: dict[str, list[str]],
+        evidence_targets: set[str],
+        preparation: SemanticPreparation,
+    ) -> bool:
+        """Whether arbitration supplied at least one Python-approved repair value."""
+        existing_ids = {ir.requirement_id for ir in preparation.requirement_irs}
+        for patch in response.requirement_patches:
+            expected = set(requirement_targets.get(patch.requirement_id, []))
+            if any(
+                field in patch.model_fields_set and getattr(patch, field) is not None
+                for field in expected
+            ):
+                return True
+        for ir in response.requirement_irs:
+            if ir.requirement_id not in existing_ids:
+                return True
+            expected = requirement_targets.get(ir.requirement_id, [])
+            if any(hasattr(ir, field) and getattr(ir, field) is not None for field in expected):
+                return True
+        if any(ann.evidence_id in evidence_targets for ann in response.evidence_annotations):
+            return True
+        return False
 
     @classmethod
     def _semantic_arbitration_user_prompt(

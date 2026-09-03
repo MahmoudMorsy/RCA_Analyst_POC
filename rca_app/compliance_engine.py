@@ -532,8 +532,31 @@ class DeterministicComplianceEngine:
                 scope_id="STRUCTURAL_INTERVAL" if item.observation_type == ObservationType.INTERVAL_STATE else "",
             ))
 
+        evidence_by_id = {item.id: item for item in canonical.evidence_inventory}
         for ann in annotations:
             if ann.resolution == SemanticResolution.UNRESOLVED:
+                continue
+            source_item = evidence_by_id.get(ann.evidence_id)
+            if source_item is None:
+                continue
+            # Deterministic compliance may consume only authoritative current-
+            # case observation sources. Historical precedent, requirements, test
+            # instructions, hypotheses and ordinary ticket prose are never
+            # normative evidence for current applicability/compliance. Current
+            # ticket content is executable only when explicitly marked as scope
+            # metadata. Diagnostics are parsed as DIRECT_OBSERVATION and remain
+            # eligible under the same current-case rule.
+            source_allowed = (
+                source_item.evidence_class in {
+                    EvidenceClass.DIRECT_OBSERVATION,
+                    EvidenceClass.REPORTED_OBSERVATION,
+                }
+                or (
+                    source_item.evidence_class == EvidenceClass.CURRENT_TICKET
+                    and source_item.scope_metadata
+                )
+            )
+            if not source_allowed:
                 continue
             for fact in ann.facts:
                 if fact.resolution != SemanticResolution.VERIFIED or not fact.subject:

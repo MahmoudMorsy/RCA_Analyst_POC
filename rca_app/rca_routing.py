@@ -190,15 +190,47 @@ class RCAEvidencePacketBuilder:
             referenced_evidence_ids.update(rr.analysis.applicability_evidence_ids)
             referenced_evidence_ids.update(rr.analysis.evaluation_evidence_ids)
         already_packeted = {x.get("evidence_id", "") for x in verified_evidence}
-        for item in canonical.evidence_inventory:
-            if (
-                item.id in referenced_evidence_ids
-                and item.id not in already_packeted
-                and item.evidence_class == EvidenceClass.DIRECT_OBSERVATION
+
+        def structural_direct(item) -> bool:
+            return (
+                item.evidence_class == EvidenceClass.DIRECT_OBSERVATION
                 and item.signal_name.strip()
                 and item.signal_value.strip()
                 and item.observation_type.value != "UNSPECIFIED"
-            ):
+            )
+
+        structural_items = [item for item in canonical.evidence_inventory if structural_direct(item)]
+        direct_by_id = {item.id: item for item in structural_items}
+        selected_direct = [direct_by_id[eid] for eid in referenced_evidence_ids if eid in direct_by_id]
+
+        # Preserve canonical snapshot context without dumping the full trace. If a
+        # selected current direct observation belongs to an explicit observation
+        # group, include its group peers. Point observations captured at the exact
+        # same timestamp on the same explicit clock are also correlated by the
+        # frozen evidence model. This is evidence closure only; no causal role is
+        # inferred by Python.
+        packet_direct_ids: Set[str] = {item.id for item in selected_direct}
+        for seed in selected_direct:
+            for candidate in structural_items:
+                same_group = bool(
+                    seed.observation_group
+                    and candidate.observation_group
+                    and seed.observation_group == candidate.observation_group
+                )
+                same_timestamp = bool(
+                    seed.timestamped
+                    and candidate.timestamped
+                    and seed.timestamp_seconds is not None
+                    and candidate.timestamp_seconds is not None
+                    and seed.clock_id
+                    and candidate.clock_id == seed.clock_id
+                    and abs(seed.timestamp_seconds - candidate.timestamp_seconds) <= 1e-9
+                )
+                if same_group or same_timestamp:
+                    packet_direct_ids.add(candidate.id)
+
+        for item in structural_items:
+            if item.id in packet_direct_ids and item.id not in already_packeted:
                 verified_evidence.append({
                     "evidence_id": item.id,
                     "fact_id": "",
@@ -208,6 +240,7 @@ class RCAEvidencePacketBuilder:
                     "observation_type": item.observation_type.value,
                     "timestamp_seconds": item.timestamp_seconds,
                     "clock_id": item.clock_id,
+                    "observation_group": item.observation_group,
                     "transition_from": item.transition_from,
                     "transition_to": item.transition_to,
                     "event_coverage_complete": item.event_coverage_complete,

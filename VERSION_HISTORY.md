@@ -1,6 +1,18 @@
 # RCA Analyst Version History
 
-## Current release — v1.8.12 / RCA Core v0.8.10 candidate
+## Current release — v1.8.13 / RCA Core v0.8.11 candidate
+
+- The exact v1.8.12 RunPod session `RCA_20260903_110944_47ac48` completed 17/17 cases and achieved **14/17 semantic PASS**. TEST-012/017 remained clean; v1.8.11 target cases TEST-007/015/016/018/021 passed; remaining failures were TEST-004/009/019.
+- v0.8.11 makes explicit structured repair targets authoritative, admits safe field-level progress from partial structural/arbitration responses, closes correlated current direct-observation snapshots in RCA packets, and prevents historical evidence from entering deterministic compliance facts.
+- v1.8.12 Models & Inference discovery/context/inference-probe fixes are preserved.
+- Release gating also fixed terminal-state publication ordering so a run session ID is persisted before COMPLETED/FAILED/CANCELLED becomes externally visible.
+- Release-candidate validation passed 253/253 tests in the working tree and 253/253 from a clean fresh extraction, plus compile/JS/API/ZIP gates. Live full-suite validation of the exact final package remains required before freezing v0.8.11.
+
+## v1.8.12 → v1.8.13
+
+See `docs/V1.8.13_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.11.md`.
+
+## Previous release — v1.8.12 / RCA Core v0.8.10 candidate
 
 - v1.8.12 is application-only; RCA semantic topology and compliance authority are unchanged.
 - Models & Inference discovery now rejects reachable endpoints with no loaded model, normalizes compatible catalog variants, resolves a single model after endpoint changes, and reports runtime context from explicit provider metadata such as llama.cpp `/props`.
@@ -34,9 +46,9 @@ See `docs/V1.8.9_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`.
 
 ## Current version model
 
-- **Application version:** v1.8.12 — Models & Inference reliability patch on the v1.8.11 semantic-contract baseline.
-- **Embedded RCA Core:** v0.8.10 candidate — verifier-completeness, canonical persistence scope, arbitration equivalence/provenance and RCA packet closure on v0.8.9.
-- **Validation:** v1.8.10 completed 17/17 live executions with 11/17 semantic PASS and clean TC12/TC17 anchors. Automated v1.8.11 release gates must pass, then the exact package must rerun the full suite before v0.8.10 can freeze.
+- **Application version:** v1.8.13 — semantic-contract hardening on the v1.8.12 application baseline.
+- **Embedded RCA Core:** v0.8.11 candidate — authoritative repair targeting, field-level repair progress, correlated RCA snapshot closure and current-case compliance source gating on v0.8.10.
+- **Validation:** v1.8.12 completed 17/17 live executions with 14/17 semantic PASS and clean TC12/TC17 anchors. The exact v1.8.13 package must rerun the full suite before v0.8.11 can freeze.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 ## v1.8.7 → v1.8.8

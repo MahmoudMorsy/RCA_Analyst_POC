@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.12 API
+# RCA Analyst v1.8.13 API
 
 Base path: `/api/v1`.
 

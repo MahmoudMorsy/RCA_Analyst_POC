@@ -1,11 +1,11 @@
-# RCA Analyst v1.8.12 — Web UI + Hardware-Independent RCA Backend
+# RCA Analyst v1.8.13 — Web UI + Hardware-Independent RCA Backend
 
-**Application version:** v1.8.12  
-**Embedded RCA Core:** v0.8.10 candidate
+**Application version:** v1.8.13  
+**Embedded RCA Core:** v0.8.11 candidate
 
-v1.8.12 is an application-only Models & Inference reliability patch on top of the v1.8.11 semantic package. It makes endpoint discovery fail visibly when no model is loaded, resolves compatible catalog/model-ID variants, discovers llama.cpp runtime context through provider metadata such as `/props`, and turns the model Test buttons into real lightweight inference probes. RCA Core remains v0.8.10 candidate.
+v1.8.13 is a semantic-core contract hardening release driven by the complete v1.8.12 RunPod session `RCA_20260903_110944_47ac48`. That run completed all 17 cases and improved semantic acceptance to 14/17, leaving TEST-004, TEST-009 and TEST-019. v1.8.13 fixes those demonstrated boundaries without changing the overall v0.8 topology or frozen evidence rules.
 
-RCA Core v0.8.10 is **not frozen** until this exact v1.8.12 package passes the full live RunPod suite. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint. TC12 and TC17 are now live-confirmed 27B anchors.
+RCA Core v0.8.11 remains **candidate**, not frozen, until this exact v1.8.13 package completes the full live RunPod suite. TC12 and TC17 remain live-confirmed 27B anchors.
 
 ## Architecture at a glance
 
@@ -17,7 +17,7 @@ RCA Backend API /api/v1
     │
     ├── asynchronous Run Manager
     ├── Storage / Sessions / History / Telemetry
-    ├── RCA Core v0.8.10
+    ├── RCA Core v0.8.11
     │       │
     │       ├── Small / Utility model roles
     │       ├── Critical Semantic Model Routing
@@ -34,6 +34,18 @@ RCA Backend API /api/v1
 ```
 
 The browser contains **zero RCA decision logic**. Model capacity may change by role, but Python remains authoritative for deterministic applicability/compliance/timing/evidence mechanics.
+
+## v1.8.13 highlights
+
+- Structured verifier `target_fields` are authoritative; explanatory prose cannot create extra repair targets.
+- Structural completion admits safe targeted fields from partial responses and leaves omitted sibling fields unresolved for the next bounded pass.
+- Arbitration admits valid targeted sibling repairs when another target field is omitted; changed untargeted fields remain rejected.
+- RCA Evidence Packets preserve correlated current direct-observation peers by explicit observation group or exact same-clock timestamp.
+- Deterministic compliance accepts semantic facts only from authoritative current-case observation sources; historical evidence can never establish current applicability/compliance.
+- v1.8.12 Models & Inference discovery/test behavior is retained unchanged.
+- Terminal run states are published only after the auto-saved session ID exists, removing an intermittent reconnect/download race.
+
+See [`docs/V1.8.13_RELEASE_NOTES.md`](docs/V1.8.13_RELEASE_NOTES.md).
 
 ## v1.8.12 highlights
 
@@ -181,7 +193,7 @@ Do not remove it until Web parity is live-proven.
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current v1.8.11 application architecture
-- [`docs/RCA_CORE_ARCHITECTURE_v0.8.10.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.10.md) — current semantic-core architecture
+- [`docs/RCA_CORE_ARCHITECTURE_v0.8.11.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.11.md) — current semantic-core architecture
 - [`docs/DESKTOP_UI_MIGRATION_MATRIX.md`](docs/DESKTOP_UI_MIGRATION_MATRIX.md) — desktop → Web parity contract
 - [`docs/API.md`](docs/API.md)
 - [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
@@ -201,6 +213,6 @@ Historical v0.8.4/v1.8.4/v1.8.5 architecture and release documents remain packag
 pytest -q
 ```
 
-v1.8.12 release validation: **248 passed** in the working tree and **248 passed** from a clean fresh extraction of the exact release ZIP, plus Python compile, Web JavaScript syntax, FastAPI health/config/capabilities smoke and ZIP hygiene/integrity gates.
+v1.8.13 release validation: **253 passed** in the working tree and **253 passed** from a clean fresh extraction of the exact release candidate, plus Python compile, Web JavaScript syntax, FastAPI health/config/capabilities smoke and ZIP integrity/hygiene gates. The final packaged ZIP is replayed again after documentation synchronization.
 
-Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun the complete live regression bundle with a stable model configuration. TC17 and TC12 remain explicit semantic anchors within that run. Do not consider RCA Core v0.8.10 frozen until live full-suite acceptance succeeds.
+Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun the complete live regression bundle with a stable model configuration. TC17 and TC12 remain explicit semantic anchors within that run. Do not consider RCA Core v0.8.11 frozen until live full-suite acceptance succeeds.

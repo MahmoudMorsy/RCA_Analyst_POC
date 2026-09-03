@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.12  
-**Current RCA semantic-core baseline:** v0.8.10 candidate  
-**Validation status:** v1.8.10 completed the full 17-case 27B RunPod suite: 17/17 executions completed, 11/17 semantic acceptance passed, and TC12/TC17 hit their expected targets. v1.8.11 fixed the six remaining semantic/integration contracts. v1.8.12 is an application-only Models & Inference reliability patch required before the next exact-package full live suite; RCA Core remains v0.8.10 candidate.
+**Current application release:** v1.8.13  
+**Current RCA semantic-core baseline:** v0.8.11 candidate  
+**Validation status:** the exact v1.8.12 RunPod session `RCA_20260903_110944_47ac48` completed all 17 cases and achieved 14/17 semantic acceptance. TC12/TC17 remained clean anchors; TEST-007/015/016/018/021 passed; remaining failures were TEST-004/009/019. v1.8.13 / RCA Core v0.8.11 addresses those demonstrated boundaries and remains candidate until an exact-package full live rerun passes.
 
 ## 1. Product vision
 
@@ -97,7 +97,7 @@ Preserve all established rules, including:
 - transport-valid IR is not automatically executable IR;
 - same-signal overlap alone is insufficient evidence materiality.
 
-## 7. Current RCA Core v0.8.10 pipeline
+## 7. Current RCA Core v0.8.11 pipeline
 
 ```text
 RAW CASE
@@ -159,19 +159,19 @@ The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic
 
 None of these changes add Python natural-language meaning extraction or weaken evidence/compliance conservatism.
 
-## 9. Current application architecture v1.8.10
+## 9. Current application architecture v1.8.13
 
 ```text
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.10
+→ RCA Core v0.8.11
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.12 retains all v1.8.11 Web/model/reconnect/failure-containment and semantic-contract improvements and adds live-suite semantic contract hardening:
+v1.8.13 retains all v1.8.12 Web/model/reconnect/failure-containment behavior and carries RCA Core v0.8.11 semantic-contract hardening:
 
 - case enters the Tests list as `RUNNING` before pipeline execution;
 - the same lifecycle row updates to PASS/FAILED/CANCELLED;
@@ -262,3 +262,15 @@ The next live full-suite focus is TEST-007/015/016/018/019/021 while TC12 and TC
 ## v1.8.12 acceptance delta
 
 Before a long RCA run, Models & Inference must provide reliable endpoint readiness checks: a reachable endpoint with no loaded model must fail discovery visibly; changing endpoint must not retain stale model/context state; a single advertised model should resolve automatically; runtime context should be reported when explicitly exposed by the provider; and Test Model must execute a minimal real inference request rather than only listing models. These are application/runtime contracts and do not alter RCA Core authority.
+
+
+## v1.8.13 acceptance delta
+
+The v1.8.12 live 27B suite proved 14/17 semantic acceptance and isolated three remaining systemic defects. v1.8.13 therefore requires:
+
+1. explicit structured verifier `target_fields` to override descriptive issue-text field-name inference;
+2. safe field-level progress from partial structural-completion and arbitration responses while omitted fields remain unresolved;
+3. compact RCA-packet closure over explicitly correlated current direct observations by observation group or exact same-clock timestamp;
+4. deterministic compliance source gating so historical evidence and other non-current/non-normative source classes cannot establish current applicability/compliance;
+5. unchanged frozen state/transition/interval, timing, persistence, provenance and Python-authority invariants;
+6. exact-package full live RunPod validation before RCA Core v0.8.11 may freeze.

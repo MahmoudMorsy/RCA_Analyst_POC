@@ -258,4 +258,4 @@ def test_v071_release_artifacts_exist_and_history_transition_is_documented():
     release = root / "docs" / "V0.7.1_RELEASE_NOTES.md"
     assert release.exists()
     assert "## v0.7.0 → v0.7.1" in history
-    assert "Current release — v1.8.12" in history
+    assert "Current release — v1.8.13" in history

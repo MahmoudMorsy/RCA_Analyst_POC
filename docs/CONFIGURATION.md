@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.12 Configuration Reference
+# RCA Analyst v1.8.13 Configuration Reference
 
 ## Top-level application configuration
 
@@ -24,7 +24,7 @@ Each role contains:
 - `transport`
 - `api_token_env`
 
-`context_size` is expected/provider metadata in v1.8.12; discovery may populate it from explicit provider runtime metadata (for example llama.cpp `/props`). It does not reconfigure an already-running external model server.
+`context_size` is expected/provider metadata in v1.8.12+; discovery may populate it from explicit provider runtime metadata (for example llama.cpp `/props`). It does not reconfigure an already-running external model server.
 
 ### `model_routing` — new in v1.8.7
 

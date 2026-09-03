@@ -1,15 +1,15 @@
-# RCA Analyst v1.8.12 Application Architecture
+# RCA Analyst v1.8.13 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.12  
-**Embedded RCA Core:** v0.8.10 candidate
+**Application version:** v1.8.13  
+**Embedded RCA Core:** v0.8.11 candidate
 
-v1.8.12 keeps the v1.8.x Web/FastAPI modular-monolith architecture and RCA Core v0.8.10 unchanged. It is an application-only reliability patch for model endpoint discovery, context metadata and active inference testing.
+v1.8.13 keeps the v1.8.x Web/FastAPI modular-monolith architecture and carries RCA Core v0.8.11. The application shell retains the v1.8.12 model endpoint discovery/context/inference-test behavior; the release changes only bounded semantic-core integration contracts.
 
-RCA Core v0.8.10 is **not frozen** until the exact v1.8.12 package passes a stable live full-suite rerun. TC12 and TC17 are live-confirmed 27B anchors from v1.8.10; TC21 remains the primary RCA integration anchor. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.11 is **not frozen** until the exact v1.8.13 package passes a stable live full-suite rerun. The exact v1.8.12 session achieved 14/17 semantic PASS; TC12 and TC17 remain live-confirmed 27B anchors and TC21 passed in that run. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.10.md`](RCA_CORE_ARCHITECTURE_v0.8.10.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.11.md`](RCA_CORE_ARCHITECTURE_v0.8.11.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
 
 ## 2. Current topology
 
@@ -24,7 +24,7 @@ Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.10.md`](RCA_
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager       RCA Core v0.8.10      Storage / Sessions
+ Async Run Manager       RCA Core v0.8.11      Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -311,3 +311,8 @@ The application topology is unchanged. v1.8.11 carries Core v0.8.10 and preserve
 ## v1.8.12 Models & Inference endpoint contract
 
 The backend distinguishes endpoint reachability from model readiness. `/models/discover` reports `AVAILABLE`, `NO_MODELS`, or `UNAVAILABLE`; compatible provider catalog aliases are normalized structurally; optional provider metadata probes enrich runtime context without controlling the external server. The Web UI invalidates endpoint-specific model/context data when an endpoint is edited and displays persistent discovery/test status. Model Test performs a minimal actual inference request. No RCA semantic logic moved into the browser or backend model-discovery layer.
+
+
+## v1.8.13 semantic-core integration contract
+
+The Web/backend topology is unchanged from v1.8.12. The embedded v0.8.11 core makes explicit structured repair targets authoritative, admits safe partial repair progress without semantic guessing, expands compact RCA current-snapshot context by explicit correlation only, and enforces current-case source authority for deterministic compliance facts. Models & Inference discovery/context/test behavior remains the v1.8.12 application contract.

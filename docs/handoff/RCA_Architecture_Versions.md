@@ -1,6 +1,6 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.12:** RCA Core v0.8.10 candidate.
+**Current RCA architecture carried by application v1.8.13:** RCA Core v0.8.11 candidate.
 
 ## 1. Persistent invariants
 
@@ -122,9 +122,9 @@ Do not weaken state/transition/interval distinctions, point-vs-scope semantics, 
 
 ## 13. Validation status
 
-RCA Core v0.8.10 is a **candidate**, not frozen.
+RCA Core v0.8.11 is a **candidate**, not frozen.
 
-The exact v1.8.10 package completed 17/17 live cases with 11/17 semantic PASS and clean TC12/TC17 anchors. Deploy the exact v1.8.12 package and rerun the complete regression bundle with the same stable 27B routing. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
+The exact v1.8.12 package completed 17/17 live cases with 14/17 semantic PASS and clean TC12/TC17 anchors. Deploy the exact v1.8.13 package and rerun the complete regression bundle with the same stable 27B routing. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
 
 
 ## A9 — v0.8.8 deterministic integration hardening
@@ -153,3 +153,15 @@ The v1.8.10 full suite reduced remaining failures to TEST-007/015/016/018/019/02
 ## Application-only v1.8.12 note
 
 v1.8.12 does not change RCA Core v0.8.10 semantics or topology. It repairs Models & Inference endpoint discovery, runtime context metadata and active inference testing before the next live full-suite gate.
+
+
+## A12 — v0.8.11 authoritative targeting, partial repair progress and source-boundary hardening
+
+The exact v1.8.12 / v0.8.10 RunPod session completed 17/17 cases and passed 14/17 semantic acceptance. The remaining TEST-004/009/019 failures exposed four bounded contracts rather than a topology failure. v0.8.11 therefore keeps the same pipeline and changes only these deterministic boundaries:
+
+- **Verifier target authority:** when a structured issue already carries `target_fields`, those fields are authoritative. Explanatory prose is not scanned for additional repair targets. Description-based inference remains fallback only for legacy structural issues without explicit targets.
+- **Field-level repair progress:** structural completion may contribute safe targeted fields even if a sibling target is omitted; the omitted field remains unresolved and is rediscovered by the next bounded integrity pass. Arbitration similarly preserves valid targeted sibling repairs instead of rejecting the entire response for one omission. Changed untargeted fields remain inadmissible, and zero-progress arbitration remains conservatively rejected.
+- **Correlated RCA snapshot closure:** compact RCA packets include canonical current direct-observation peers from the same explicit `observation_group` or exact same-clock timestamp when one member is already selected. This preserves authoritative context without dumping the whole trace and without inferring causality.
+- **Current-case compliance source gate:** language-derived deterministic facts are admitted only from authoritative current-case observation classes: direct observations, reported observations, or explicitly marked current-ticket scope metadata. Historical evidence, requirements, test instructions, hypotheses and ordinary ticket prose cannot establish current applicability/compliance. Diagnostics remain eligible because canonical diagnostics are current direct observations.
+
+All frozen evidence semantics and Python final compliance authority remain unchanged.

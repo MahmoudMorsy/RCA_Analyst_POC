@@ -162,11 +162,13 @@ class RunManager:
             if runtime.cancellation.cancelled:
                 self._finish_cancelled(runtime, runtime.cancellation.reason or "Cancelled by user.")
                 return
-            self._set_state(runtime, RunState.COMPLETED)
+            # A terminal run summary must never become externally visible before
+            # its auto-saved session ID exists. Prepare metrics/session first
+            # using the intended terminal status, then publish COMPLETED.
             runtime.summary.finished_at = _now()
-            self._finalize_metrics(runtime)
-            self._persist(runtime)
-            self._auto_session(runtime)
+            self._finalize_metrics(runtime, status_override=RunState.COMPLETED)
+            self._auto_session(runtime, status_override=RunState.COMPLETED)
+            self._set_state(runtime, RunState.COMPLETED)
         except AnalysisCancelled as exc:
             self._finish_cancelled(runtime, str(exc))
         except PipelineValidationError as exc:
@@ -428,27 +430,27 @@ class RunManager:
         for row in runtime.case_lifecycle:
             if row.get("execution_status") == "RUNNING":
                 row.update({"execution_status": "CANCELLED", "finished_at": _now(), "result_available": False})
-        runtime.summary.status = RunState.CANCELLED
         runtime.summary.error = message
         runtime.summary.finished_at = _now()
         self._log(runtime, "CANCELLED", message)
+        self._finalize_metrics(runtime, status_override=RunState.CANCELLED)
+        self._auto_session(runtime, status_override=RunState.CANCELLED)
+        runtime.summary.status = RunState.CANCELLED
         self._event(runtime, "run_state", {"status": RunState.CANCELLED.value, "message": message})
-        self._finalize_metrics(runtime)
         self._persist(runtime)
-        self._auto_session(runtime)
 
     def _set_failed(self, runtime: RuntimeRun, message: str) -> None:
         for row in runtime.case_lifecycle:
             if row.get("execution_status") == "RUNNING":
                 row.update({"execution_status": "FAILED", "finished_at": _now(), "result_available": False})
-        runtime.summary.status = RunState.FAILED
         runtime.summary.error = message
         runtime.summary.finished_at = _now()
         self._log(runtime, "FAILED", message)
+        self._finalize_metrics(runtime, status_override=RunState.FAILED)
+        self._auto_session(runtime, status_override=RunState.FAILED)
+        runtime.summary.status = RunState.FAILED
         self._event(runtime, "run_state", {"status": RunState.FAILED.value, "message": message})
-        self._finalize_metrics(runtime)
         self._persist(runtime)
-        self._auto_session(runtime)
 
     def _set_state(self, runtime: RuntimeRun, state: RunState) -> None:
         with runtime.lock:
@@ -612,9 +614,9 @@ class RunManager:
                 "endpoints": sorted({str(x.get("endpoint") or "") for x in calls if x.get("endpoint")}),
             }
 
-    def _finalize_metrics(self, runtime: RuntimeRun) -> None:
+    def _finalize_metrics(self, runtime: RuntimeRun, status_override: Optional[RunState] = None) -> None:
         runtime.metrics["system_end"] = self.system_info.snapshot(self.storage.root)
-        runtime.metrics["status"] = runtime.summary.status.value
+        runtime.metrics["status"] = (status_override or runtime.summary.status).value
         self._attach_stage_statistics(runtime)
         runtime.metrics["started_at"] = runtime.summary.started_at
         runtime.metrics["finished_at"] = runtime.summary.finished_at
@@ -642,7 +644,7 @@ class RunManager:
         }
         self.storage.write_json(f"runs/{runtime.summary.run_id}/metrics.json", runtime.metrics)
 
-    def _auto_session(self, runtime: RuntimeRun) -> None:
+    def _auto_session(self, runtime: RuntimeRun, status_override: Optional[RunState] = None) -> None:
         if runtime.result is not None:
             payload = copy.deepcopy(runtime.result)
             # Preserve the existing result/batch envelope shape while ensuring a
@@ -657,7 +659,7 @@ class RunManager:
         envelope = self.sessions.make_envelope(
             session_id=session_id,
             run_id=runtime.summary.run_id,
-            status=runtime.summary.status.value,
+            status=(status_override or runtime.summary.status).value,
             payload=payload,
             config_snapshot=runtime.config.model_dump(mode="json"),
             deployment=self.settings.deployment.model_dump(mode="json"),

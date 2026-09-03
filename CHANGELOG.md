@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.13
+
+- Promote application to **v1.8.13** with embedded **RCA Core v0.8.11 candidate** after the exact v1.8.12 27B RunPod suite completed 17/17 cases with 14/17 semantic acceptance.
+- Make explicit verifier `target_fields` authoritative over descriptive issue text, fixing TEST-019 false trigger/timing repair targets.
+- Admit safe targeted structural-completion progress from partial patches; omitted sibling fields remain unresolved and can be retried in the second bounded pass.
+- Admit valid targeted arbitration sibling repairs when another target field is omitted; zero-progress or changed-untargeted responses remain rejected conservatively.
+- Expand RCA packet direct-observation closure to explicit observation-group peers and exact same-clock timestamp peers without dumping the complete trace or inferring causality.
+- Gate deterministic semantic facts by authoritative current-case source class so historical evidence, system requirements, test instructions and ordinary ticket prose cannot establish current applicability/compliance.
+- Add v1.8.13 regressions for TEST-004/009/019 failure classes and historical non-normativity.
+- Fix a terminal-state/session autosave race found during release gating so COMPLETED/FAILED/CANCELLED is not externally published before the run session ID is persisted.
+
 ## 1.8.12
 
 - Application-only Models & Inference reliability patch; RCA Core remains **v0.8.10 candidate**.
