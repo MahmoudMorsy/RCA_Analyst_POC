@@ -1,6 +1,6 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.10:** RCA Core v0.8.9 candidate.
+**Current RCA architecture carried by application v1.8.11:** RCA Core v0.8.10 candidate.
 
 ## 1. Persistent invariants
 
@@ -122,9 +122,9 @@ Do not weaken state/transition/interval distinctions, point-vs-scope semantics, 
 
 ## 13. Validation status
 
-RCA Core v0.8.9 is a **candidate**, not frozen.
+RCA Core v0.8.10 is a **candidate**, not frozen.
 
-Deploy the exact v1.8.10 package and rerun the complete regression bundle with stable model settings. TC12, TC17 and TC21 remain explicit semantic/integration anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
+The exact v1.8.10 package completed 17/17 live cases with 11/17 semantic PASS and clean TC12/TC17 anchors. Deploy the exact v1.8.11 package and rerun the complete regression bundle with the same stable 27B routing. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
 
 
 ## A9 — v0.8.8 deterministic integration hardening
@@ -143,3 +143,8 @@ The first exact v1.8.9 27B suite attempt exposed a TEST-007 field-contract excep
 - persistence scope uses coarse structural normalization of the already-structured scope field, avoiding arbitrary generated-string mismatch without parsing authoritative requirement prose.
 
 Frozen evidence/compliance invariants are unchanged.
+
+
+## A11 — v0.8.10 verifier/persistence/arbitration/RCA-packet contract hardening
+
+The v1.8.10 full suite reduced remaining failures to TEST-007/015/016/018/019/021. v0.8.10 retains topology and adds: complete VERIFIED verifier fingerprints; canonical requirement persistence scope distinct from evidence observation type; redundant-unchanged arbitration-field tolerance with strict changed-field rejection; automatic source-clause companion targeting for newly-created semantics; referenced canonical direct observations in RCA packets; and persisted arbitration rejection diagnostics.

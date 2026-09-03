@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.8.11
+
+- Promote application to **v1.8.11** with embedded **RCA Core v0.8.10 candidate** after the exact v1.8.10 27B RunPod suite completed 17/17 executions and achieved 11/17 semantic acceptance.
+- Require structurally complete `resolution=VERIFIED` independent-verifier fingerprints; incomplete behavior/trigger/timing/relationship identity now enters structured-output recovery rather than becoming a false semantic mismatch.
+- Introduce canonical Requirement persistence-scope categories and reject evidence-domain values such as `INTERVAL_STATE`.
+- Allow redundant unchanged untargeted arbitration fields while continuing to reject changed untargeted fields and merge only Python-approved targets.
+- Automatically couple newly-created executable semantic elements to `source_clauses` repair when the corresponding provenance role is absent.
+- Add referenced canonical structural direct observations to the RCA Evidence Packet even when no language annotation was needed.
+- Persist exact arbitration contract-rejection reasons in attempt diagnostics/validation issues.
+- Add v1.8.11 regressions for TEST-007/015/016/018/019/021 failure classes.
+- TC12 and TC17 are live-confirmed 27B anchors from the v1.8.10 suite; v0.8.10 remains candidate pending exact-package v1.8.11 full-suite acceptance.
+
 ## 1.8.10
 
 - Promote application to **v1.8.10** with embedded **RCA Core v0.8.9 candidate**.

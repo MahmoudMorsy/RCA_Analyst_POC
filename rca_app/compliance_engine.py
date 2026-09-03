@@ -662,7 +662,7 @@ class DeterministicComplianceEngine:
     def _render_persistence(ir: RequirementIR) -> str:
         if ir.persistence is None or not ir.persistence.required:
             return ""
-        return f"Persist across scope: {ir.persistence.scope}"
+        return f"Persist across scope: {getattr(ir.persistence.scope, 'value', ir.persistence.scope)}"
 
     @staticmethod
     def _app_need(ir: RequirementIR) -> EvidenceNeed:

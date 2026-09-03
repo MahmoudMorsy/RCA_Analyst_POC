@@ -169,6 +169,20 @@ class ScopeResolution(str, Enum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
+class RequirementPersistenceScope(str, Enum):
+    """Canonical requirement-side persistence scope categories.
+
+    This is deliberately separate from evidence ObservationType.  Requirement
+    semantics such as ``WHILE_CONDITION`` must never be represented by evidence
+    tokens such as ``INTERVAL_STATE``.
+    """
+
+    WHILE_CONDITION = "WHILE_CONDITION"
+    CASE_EVALUATED_INTERVAL = "CASE_EVALUATED_INTERVAL"
+    EXPLICIT_RESOLVED_SCOPE = "EXPLICIT_RESOLVED_SCOPE"
+    UNSPECIFIED = "UNSPECIFIED"
+
+
 class SemanticClauseRole(str, Enum):
     CONDITION = "CONDITION"
     TRIGGER = "TRIGGER"
@@ -555,13 +569,37 @@ class RequirementTimingIR(StrictModel):
 class RequirementPersistenceIR(StrictModel):
     semantic_id: str = ""
     required: bool = False
-    scope: str = "WHILE_CONDITION"
+    scope: RequirementPersistenceScope = RequirementPersistenceScope.WHILE_CONDITION
     source_phrase: str = ""
 
     @model_validator(mode="before")
     @classmethod
-    def normalize_null_string_sentinels(cls, data):
-        return _coerce_none_strings(data, {"semantic_id", "scope", "source_phrase"})
+    def normalize_scope_contract(cls, data):
+        out = _coerce_none_strings(data, {"semantic_id", "scope", "source_phrase"})
+        if not isinstance(out, dict):
+            return out
+        out = dict(out)
+        raw = str(out.get("scope") or "").strip()
+        token = raw.upper().replace("-", "_").replace(" ", "_")
+        if not raw:
+            out["scope"] = RequirementPersistenceScope.UNSPECIFIED.value
+        elif token in {"WHILE_CONDITION", "WHILE_CONDITION_ACTIVE", "WHILE_THE_CONDITION_IS_TRUE"} or raw.casefold().startswith("while "):
+            out["scope"] = RequirementPersistenceScope.WHILE_CONDITION.value
+        elif token in {"CASE_EVALUATED_INTERVAL", "COMPLETE_EVALUATED_INTERVAL"}:
+            out["scope"] = RequirementPersistenceScope.CASE_EVALUATED_INTERVAL.value
+        elif token in {x.value for x in RequirementPersistenceScope}:
+            out["scope"] = token
+        elif token in {"INTERVAL_STATE", "STATE_SAMPLE", "TRANSITION", "UNSPECIFIED_OBSERVATION"}:
+            # Evidence observation semantics are a different domain.  Leave the
+            # invalid token intact so Pydantic rejects it and the bounded
+            # structured-output retry can correct the model response.
+            out["scope"] = raw
+        else:
+            # A model-authored explicit scope may have a source-specific label.
+            # Preserve that meaning categorically; source_phrase remains the
+            # provenance for the exact wording.
+            out["scope"] = RequirementPersistenceScope.EXPLICIT_RESOLVED_SCOPE.value
+        return out
 
 
 class RequirementRelationshipIR(StrictModel):
@@ -786,6 +824,56 @@ class RequirementSemanticVerificationItem(StrictModel):
     def normalize_null_string_sentinels(cls, data):
         return _coerce_none_strings(data, {"notes"})
 
+    @model_validator(mode="after")
+    def require_complete_verified_fingerprint(self):
+        """A VERIFIED verifier result must itself be structurally comparable.
+
+        Missing executable identity fields are a verifier transport/schema defect,
+        not evidence that the compiler disagrees with the source. Raising here
+        routes the response through the existing bounded structured-output retry.
+        PARTIALLY_RESOLVED/UNRESOLVED items may remain structurally incomplete.
+        """
+        if self.resolution != SemanticResolution.VERIFIED:
+            return self
+        fp = self.independent_semantics
+
+        def check_logic(node: Optional[LogicExpression]):
+            if node is None:
+                return
+            if node.kind == LogicKind.PREDICATE:
+                if not node.signal.strip() or node.operator == PredicateOperator.OTHER:
+                    raise ValueError(f"Verified semantic fingerprint {self.requirement_id} contains incomplete condition predicate")
+                if node.operator not in {PredicateOperator.PRESENT, PredicateOperator.ABSENT} and not node.value.strip():
+                    raise ValueError(f"Verified semantic fingerprint {self.requirement_id} condition predicate is missing value")
+            elif node.kind == LogicKind.NOT and len(node.children) != 1:
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} contains malformed NOT condition")
+            elif node.kind in {LogicKind.AND, LogicKind.OR} and len(node.children) < 2:
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} contains malformed Boolean condition")
+            for child in node.children:
+                check_logic(child)
+
+        check_logic(fp.condition)
+        if fp.trigger is not None:
+            if not fp.trigger.signal.strip() or not fp.trigger.event.strip():
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} contains incomplete trigger")
+            if fp.trigger.event.strip().upper() == "BECOMES" and not fp.trigger.value.strip():
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} BECOMES trigger is missing value")
+        if fp.required_behavior is not None and fp.required_behavior.signal.strip():
+            behavior = fp.required_behavior
+            if behavior.operator == PredicateOperator.OTHER:
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} required_behavior is missing executable operator")
+            if behavior.operator not in {PredicateOperator.PRESENT, PredicateOperator.ABSENT} and not behavior.value.strip():
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} required_behavior is missing value")
+        if fp.timing is not None and fp.timing.limit_ms is None:
+            raise ValueError(f"Verified semantic fingerprint {self.requirement_id} timing is missing limit_ms")
+        if fp.persistence is not None:
+            if not fp.persistence.required or fp.persistence.scope == RequirementPersistenceScope.UNSPECIFIED:
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} persistence is incomplete")
+        for rel in fp.relationships:
+            if not rel.relationship_type.strip() or not rel.target_requirement_id.strip():
+                raise ValueError(f"Verified semantic fingerprint {self.requirement_id} contains incomplete relationship")
+        return self
+
 
 class RequirementSemanticVerificationBatch(StrictModel):
     """Independent fast-model check that compiled IR preserves source meaning."""
@@ -806,7 +894,7 @@ class SemanticIntegrityIssue(StrictModel):
 class SemanticArbitrationResponse(StrictModel):
     """One case-level 27B arbitration response containing issue-scoped repairs.
 
-    v0.8.9 uses field-level RequirementStructuralPatch objects so arbitration
+    v0.8.10 uses field-level RequirementStructuralPatch objects so arbitration
     cannot accidentally overwrite already-verified Requirement IR fields.
     ``requirement_irs`` remains accepted for missing-compiler-candidate recovery
     and backward-compatible session deserialization only.

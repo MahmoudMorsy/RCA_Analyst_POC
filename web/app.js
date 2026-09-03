@@ -86,7 +86,7 @@ function renderCapabilities(){
 function renderEnvironmentOverrides(){
   const overrides=state.capabilities?.environment_overrides||{},box=$('modelOverrideWarning');const rows=Object.entries(overrides);
   if(!rows.length){box.textContent='';box.hidden=true;box.classList.remove('show');return;}box.hidden=false;box.classList.add('show');
-  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.10 run-specific configuration overrides remain authoritative for the run you start.</span>`;
+  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.11 run-specific configuration overrides remain authoritative for the run you start.</span>`;
 }
 
 const configMap={

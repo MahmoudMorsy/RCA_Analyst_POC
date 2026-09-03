@@ -102,7 +102,7 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
 
     def _capabilities(cfg: ApplicationConfig) -> dict[str, Any]:
         snap = system_info.snapshot(storage.root)
-        # v1.8.10 does not own the lifecycle of external LM Studio/llama.cpp/vLLM
+        # v1.8.11 does not own the lifecycle of external LM Studio/llama.cpp/vLLM
         # processes. Engine controls therefore remain visible as deployment
         # metadata but are capability-disabled unless a future deployment
         # adapter explicitly declares that the backend manages that setting.

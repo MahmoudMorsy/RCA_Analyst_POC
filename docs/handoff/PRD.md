@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.10  
-**Current RCA semantic-core baseline:** v0.8.9 candidate  
-**Validation status:** automated release gates are required. RCA Core v0.8.9 remains unfrozen until the exact v1.8.10 package passes a stable live full-suite rerun. TC12, TC17 and TC21 remain explicit semantic/integration anchors inside that rerun.
+**Current application release:** v1.8.11  
+**Current RCA semantic-core baseline:** v0.8.10 candidate  
+**Validation status:** v1.8.10 completed the full 17-case 27B RunPod suite: 17/17 executions completed, 11/17 semantic acceptance passed, and TC12/TC17 hit their expected targets. v1.8.11 fixes the six remaining contract failures and remains candidate until its exact package passes the full live suite.
 
 ## 1. Product vision
 
@@ -97,7 +97,7 @@ Preserve all established rules, including:
 - transport-valid IR is not automatically executable IR;
 - same-signal overlap alone is insufficient evidence materiality.
 
-## 7. Current RCA Core v0.8.9 pipeline
+## 7. Current RCA Core v0.8.10 pipeline
 
 ```text
 RAW CASE
@@ -165,13 +165,13 @@ None of these changes add Python natural-language meaning extraction or weaken e
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.9
+→ RCA Core v0.8.10
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.10 retains all v1.8.9 Web/model/reconnect improvements and adds testcase failure containment plus richer failure/session forensics:
+v1.8.11 retains all v1.8.10 Web/model/reconnect/failure-containment improvements and adds live-suite semantic contract hardening:
 
 - case enters the Tests list as `RUNNING` before pipeline execution;
 - the same lifecycle row updates to PASS/FAILED/CANCELLED;
@@ -243,3 +243,17 @@ Every release must:
 In addition to all v1.8.9 requirements, sequential regression/bundle execution must continue after a testcase-local unexpected exception. Pipeline construction is inside testcase isolation. Generic failure records must preserve exception type/message/traceback and partial pipeline. Session export must preserve partial results plus any run-level failure.
 
 RCA Core arbitration is a repair mechanism, not a liveness dependency: a contract-invalid arbitration response is rejected atomically, its raw attempt is retained, material issues remain unresolved, and compliance continues conservatively. A target field may be omitted only when every material issue governing that field is explicitly unresolved. Independent verifier equality must compare executable semantics rather than descriptive `process_description` text, and persistence scope comparison must use normalized structured categories rather than arbitrary model wording.
+
+
+## v1.8.11 acceptance delta
+
+The exact v1.8.10 27B suite proved the application-level batch continuation fix and live-confirmed TC12/TC17. v1.8.11 acceptance additionally requires:
+
+- `resolution=VERIFIED` verifier fingerprints are structurally complete before comparison;
+- requirement persistence scope is canonical and distinct from evidence observation types;
+- redundant unchanged untargeted arbitration fields are ignored, while changed untargeted fields remain rejected;
+- creating a missing executable semantic field also targets `source_clauses` when its audit role is absent;
+- referenced canonical structural direct observations are present in the RCA Evidence Packet;
+- arbitration contract rejection reason is preserved in attempt diagnostics.
+
+The next live full-suite focus is TEST-007/015/016/018/019/021 while TC12 and TC17 remain non-regression anchors.

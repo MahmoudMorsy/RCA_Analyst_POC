@@ -96,7 +96,7 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.9 adaptive semantic-compiler RCA architecture.
+    """v0.8.10 adaptive semantic-compiler RCA architecture.
 
     Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
@@ -897,15 +897,17 @@ class RCAPipeline:
                     system_prompt=SEMANTIC_ARBITRATION_PROMPT,
                     user_prompt=arb_prompt,
                     response_model=SemanticArbitrationResponse,
-                    schema_name="rca_semantic_arbitration_v088",
+                    schema_name="rca_semantic_arbitration_v0810",
                 )
                 stats.append(arb_response.stats)
                 attempts.append(self._make_aux_attempt(len(attempts)+1, "semantic_arbitration", "PRIMARY_SEMANTIC_ARBITRATION", arb_response))
                 semantic_arbitration = arb_response.parsed
                 try:
-                    self._validate_arbitration_response(
+                    arbitration_contract_notes = self._validate_arbitration_response(
                         semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets, material, semantic_preparation
                     )
+                    if arbitration_contract_notes:
+                        attempts[-1].retry_diagnostics.extend(arbitration_contract_notes)
                     semantic_preparation = self.semantic_arbitration_merger.apply(
                         semantic_preparation, semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets
                     )
@@ -919,6 +921,14 @@ class RCAPipeline:
                     raw_llm_json = arb_response.raw_json
                     raw_requirement_reasoning_json = arb_response.raw_json
                     semantic_arbitration = None
+                    contract_message = str(contract_exc)
+                    attempts[-1].retry_diagnostics.append("Arbitration contract rejection: " + contract_message)
+                    attempts[-1].validation_issues.append(ValidationIssue(
+                        code="SEMANTIC_ARBITRATION_CONTRACT_REJECTED",
+                        severity=ValidationSeverity.ERROR,
+                        path="semantic_arbitration",
+                        message=contract_message,
+                    ))
                     self._emit_trace(
                         trace, "08_semantic_arbitration", "27B Semantic Arbitration", "attention",
                         "Arbitration response was rejected by the field-level repair contract; no patch was applied and unresolved semantics remain conservative.",
@@ -1129,9 +1139,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.9 analysis is ready for session export.",
+                         "Validated v0.8.10 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.9 analysis completed.")
+        progress("Complete", "v0.8.10 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1651,21 +1661,8 @@ class RCAPipeline:
         def persistence(x):
             if x is None:
                 return None
-            raw = cls._normalized_semantic_value(x.scope)
-            token = raw.replace("-", "_").replace(" ", "_")
-            # RequirementPersistenceIR.scope is model-authored structured data,
-            # not authoritative source prose. Normalize only its structural
-            # category so equivalent wording such as "WHILE_CONDITION" and
-            # "while <compiled condition>" does not cause a false mismatch.
-            if token in {"while_condition", "while_the_condition_is_true"} or raw.startswith("while "):
-                scope_kind = "WHILE_CONDITION"
-            elif token in {"case_evaluated_interval", "complete_evaluated_interval"} or "evaluated interval" in raw:
-                scope_kind = "CASE_EVALUATED_INTERVAL"
-            elif raw:
-                scope_kind = "EXPLICIT_SCOPE"
-            else:
-                scope_kind = "UNSPECIFIED"
-            return (bool(x.required), scope_kind)
+            scope = getattr(x.scope, "value", x.scope)
+            return (bool(x.required), str(scope))
         rels = sorted((cls._normalized_semantic_value(x.relationship_type), cls._normalized_semantic_value(x.target_requirement_id)) for x in fp.relationships)
         return {
             "normative_type": fp.normative_type.value,
@@ -1784,6 +1781,31 @@ class RCAPipeline:
             explicit = set(issue.target_fields) & supported
             if explicit:
                 targets.setdefault(issue.requirement_id, set()).update(explicit)
+
+        # Provenance is a structural dependency of newly-created executable
+        # semantic elements. If a targeted repair fills a previously absent field
+        # and the current audit inventory has no clause for that role, the same
+        # arbitration call must also return the complete source_clauses inventory.
+        by_id = {x.requirement_id: x for x in preparation.requirement_irs}
+        role_for_field = {
+            "condition": "CONDITION",
+            "trigger": "TRIGGER",
+            "required_behavior": "REQUIRED_BEHAVIOR",
+            "timing": "TIMING",
+            "persistence": "PERSISTENCE",
+            "relationships": "RELATIONSHIP",
+        }
+        for rid, fields in list(targets.items()):
+            ir = by_id[rid]
+            existing_roles = {c.role.value for c in ir.source_clauses}
+            for field in list(fields):
+                role = role_for_field.get(field)
+                if not role or role in existing_roles:
+                    continue
+                current = getattr(ir, field, None)
+                is_absent = current is None or (field == "relationships" and not current)
+                if is_absent:
+                    fields.add("source_clauses")
         return {rid: sorted(fields) for rid, fields in targets.items() if fields}
 
     @classmethod
@@ -1794,7 +1816,7 @@ class RCAPipeline:
         evidence_targets: set[str],
         material_issues,
         preparation: SemanticPreparation,
-    ) -> None:
+    ) -> list[str]:
         """Validate one issue-scoped arbitration response before any merge.
 
         Existing IRs are repaired atomically by field patch. Full RequirementIR
@@ -1838,6 +1860,16 @@ class RCAPipeline:
             "normative_type", "condition", "trigger", "required_behavior",
             "timing", "persistence", "relationships", "source_clauses",
         }
+        current_by_id = {x.requirement_id: x for x in preparation.requirement_irs}
+        contract_notes: list[str] = []
+
+        def structured_value(value):
+            if hasattr(value, "model_dump"):
+                return value.model_dump(mode="json")
+            if isinstance(value, list):
+                return [structured_value(x) for x in value]
+            return value
+
         seen_patches = set()
         for patch in response.requirement_patches:
             rid = patch.requirement_id
@@ -1854,8 +1886,17 @@ class RCAPipeline:
             }
             expected = set(requirement_targets[rid])
             unexpected = supplied - expected
-            if unexpected:
-                raise ValueError(f"Arbitration patch attempted untargeted fields for {rid}: {sorted(unexpected)}")
+            changed_untargeted = set()
+            for field in unexpected:
+                current_value = getattr(current_by_id[rid], field)
+                patch_value = getattr(patch, field)
+                if structured_value(current_value) == structured_value(patch_value):
+                    contract_notes.append(f"Ignored redundant unchanged arbitration field {rid}.{field}.")
+                else:
+                    changed_untargeted.add(field)
+            if changed_untargeted:
+                raise ValueError(f"Arbitration patch attempted changed untargeted fields for {rid}: {sorted(changed_untargeted)}")
+            supplied = supplied - unexpected
             missing = expected - supplied
             invalid_missing = set()
             for field in missing:
@@ -1920,6 +1961,7 @@ class RCAPipeline:
             ev_issues = issues_by_evidence.get(eid, set())
             if not ev_issues or not ev_issues.issubset(unresolved):
                 raise ValueError(f"Arbitration omitted targeted evidence replacement for {eid}")
+        return contract_notes
 
     @classmethod
     def _semantic_arbitration_user_prompt(

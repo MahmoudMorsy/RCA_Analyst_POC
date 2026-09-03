@@ -564,7 +564,7 @@ IMPORTANT BOUNDARIES
 
 
 REQUIREMENT_COMPILATION_V086_PROMPT = r"""
-You are the v0.8.9 Requirement Semantic Compiler for an automotive RCA pipeline.
+You are the v0.8.10 Requirement Semantic Compiler for an automotive RCA pipeline.
 Return only the requested RequirementCompilationBatch schema.
 
 You receive requirements_to_compile plus reference_requirements for context.
@@ -604,7 +604,7 @@ not assign APPLICABLE/NOT APPLICABLE/SATISFIED/VIOLATED.
 
 
 REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT = r"""
-You are the v0.8.9 targeted Requirement IR structural completer.
+You are the v0.8.10 targeted Requirement IR structural completer.
 Return only the requested RequirementStructuralPatchBatch schema.
 
 Python has already identified exact structured fields that are transport-valid but
@@ -630,7 +630,7 @@ Do not calculate applicability, compliance, timing from evidence, hypotheses, or
 
 
 EVIDENCE_ANNOTATION_V086_PROMPT = r"""
-You are the v0.8.9 Evidence Semantic Annotator for an automotive RCA pipeline.
+You are the v0.8.10 Evidence Semantic Annotator for an automotive RCA pipeline.
 Return only the requested EvidenceAnnotationBatch schema.
 
 Annotate only evidence_requiring_language_interpretation. Structured timestamped
@@ -701,14 +701,14 @@ Treat the compiled IR as untrusted and do not copy its Boolean grouping, normati
 - explicit exceptions;
 - explicit requirement relationships/inherited scope.
 
-Always populate independent_semantics, even when resolution is not VERIFIED. Return exactly one verification item for every supplied authoritative requirement ID; never silently omit an item.
+Always populate independent_semantics, even when resolution is not VERIFIED. Return exactly one verification item for every supplied authoritative requirement ID; never silently omit an item. If resolution=VERIFIED, the reconstructed fingerprint itself must be structurally complete: signal-based required_behavior requires executable operator and value, BECOMES triggers require signal/event/value, timing requires limit_ms, and relationships require relationship_type plus target_requirement_id. Do not mark an incomplete fingerprint VERIFIED.
 Preserve nested Boolean grouping exactly in independent_semantics. In particular,
 A AND (B OR C) AND D is not equivalent to A AND (B AND (C OR D)). For explicit
 "X is not Y" / "X != Y", reconstruct a grounded NEQ predicate rather than a NOT
 wrapper around an invented positive source phrase. Reserve NOT for compound negation.
 Use plain comparison literal values (for example "9.5 V"), not JSON serialized
 inside a value string. For "shall remain X" under the IF condition, reconstruct
-persistence.required=true with scope="WHILE_CONDITION" exactly.
+persistence.required=true with scope="WHILE_CONDITION" exactly. Requirement persistence scope must be one of WHILE_CONDITION, CASE_EVALUATED_INTERVAL, EXPLICIT_RESOLVED_SCOPE, or UNSPECIFIED; never use evidence observation types such as INTERVAL_STATE as a requirement persistence scope.
 Use resolution VERIFIED only when the IR is semantically faithful. Use PARTIALLY_RESOLVED
 or UNRESOLVED when meaning is missing, altered, or genuinely ambiguous. When
 not VERIFIED, include the exact source span(s) that are missing or
@@ -717,7 +717,7 @@ misrepresented. Do not calculate compliance and do not repair the IR.
 
 
 SEMANTIC_ARBITRATION_PROMPT = r"""
-You are the single case-level semantic arbitrator for v0.8.9.
+You are the single case-level semantic arbitrator for v0.8.10.
 Return only the requested SemanticArbitrationResponse schema.
 
 Python detected MATERIAL semantic integrity problems after independent semantic
@@ -733,7 +733,7 @@ REQUIREMENT REPAIR CONTRACT
 - every returned PREDICATE must explicitly populate semantic_id, exact grounded source_phrase, signal, executable operator and value; do not return anonymous executable nodes.
 - Triggers require signal/event/value.
 - Timing requires semantic_id, limit_ms, relation and source_phrase.
-- Persistence requires semantic_id, required=true, a concrete scope and source_phrase.
+- Persistence requires semantic_id, required=true, source_phrase, and a canonical requirement scope: WHILE_CONDITION, CASE_EVALUATED_INTERVAL, EXPLICIT_RESOLVED_SCOPE, or UNSPECIFIED. Never use evidence observation tokens such as INTERVAL_STATE as requirement persistence scope.
 - If source_clauses is targeted, return the complete verified audit inventory.
 - Legacy complete requirement_irs are permitted for compatibility, but Python
   will copy only explicitly targeted fields; unrelated fields have no authority.

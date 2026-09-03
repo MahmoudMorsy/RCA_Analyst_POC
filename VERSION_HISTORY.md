@@ -1,12 +1,16 @@
 # RCA Analyst Version History
 
-## Current release — v1.8.10 / RCA Core v0.8.9 candidate
+## Current release — v1.8.11 / RCA Core v0.8.10 candidate
 
-- The first exact v1.8.9 27B full-suite attempt stopped at TEST-007 because an arbitration field-contract `ValueError` escaped testcase scope; later cases were never executed.
-- v1.8.10 isolates unexpected testcase failures so a bundle continues, preserves forensic exception/traceback/partial-pipeline data, and keeps partial results plus run-level failure metadata in sessions.
-- RCA Core v0.8.9 treats invalid arbitration repair as conservative unresolved semantics rather than a pipeline crash, supports field-level explicit unresolved decisions, and persists rejected arbitration output.
-- Independent semantic verification now compares executable behavior semantics rather than descriptive `process_description` text and normalizes persistence scope categories instead of arbitrary wording.
-- Release validation: **232 passed** in the working tree and **232 passed** from a clean fresh extraction of the exact final ZIP; live full-suite validation remains required before freezing v0.8.9.
+- The exact v1.8.10 27B RunPod suite completed all 17 cases; 11/17 passed semantic acceptance. TC12 and TC17 passed their live targets.
+- v1.8.11 rejects structurally incomplete VERIFIED verifier fingerprints instead of converting missing verifier fields into false compiler disagreements.
+- RCA Core v0.8.10 introduces canonical requirement persistence scope, atomic-equivalence handling for redundant unchanged arbitration fields, provenance companion targeting for newly-created semantics, and canonical direct-observation closure in RCA packets.
+- Arbitration rejection reasons are now persisted with the raw attempt.
+- Release validation: **241 passed** in the working tree and **241 passed** from a clean fresh extraction of the exact final ZIP; live full-suite v1.8.11 validation remains required before freezing v0.8.10.
+
+## v1.8.10 → v1.8.11
+
+See `docs/V1.8.11_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.10.md`.
 
 ## v1.8.9 → v1.8.10
 
@@ -18,9 +22,9 @@ See `docs/V1.8.9_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`.
 
 ## Current version model
 
-- **Application version:** v1.8.10 — testcase failure containment, failure/session forensics and Web failure-detail hardening on the v1.8.9 application baseline.
-- **Embedded RCA Core:** v0.8.9 candidate — arbitration containment plus executable-semantic verifier-equivalence hardening on v0.8.8.
-- **Validation:** automated release gates must pass; RCA Core v0.8.9 remains unfrozen until the exact v1.8.10 package passes a stable live full-suite rerun. TC12, TC17 and TC21 remain explicit anchors.
+- **Application version:** v1.8.11 — live-full-suite semantic-contract hardening on the v1.8.10 failure-containment application baseline.
+- **Embedded RCA Core:** v0.8.10 candidate — verifier-completeness, canonical persistence scope, arbitration equivalence/provenance and RCA packet closure on v0.8.9.
+- **Validation:** v1.8.10 completed 17/17 live executions with 11/17 semantic PASS and clean TC12/TC17 anchors. Automated v1.8.11 release gates must pass, then the exact package must rerun the full suite before v0.8.10 can freeze.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 ## v1.8.7 → v1.8.8

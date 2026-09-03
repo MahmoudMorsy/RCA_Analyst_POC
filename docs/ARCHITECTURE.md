@@ -1,15 +1,15 @@
-# RCA Analyst v1.8.10 Application Architecture
+# RCA Analyst v1.8.11 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.10  
-**Embedded RCA Core:** v0.8.9 candidate
+**Application version:** v1.8.11  
+**Embedded RCA Core:** v0.8.10 candidate
 
-v1.8.10 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.9 reconnect/live-view improvements. It carries RCA Core v0.8.9, which adds arbitration failure containment and verifier-equivalence hardening after the first exact-package v1.8.9 27B suite stopped at TEST-007.
+v1.8.11 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.10 failure-containment/reconnect/live-view behavior. It carries RCA Core v0.8.10, a narrow contract-hardening release driven by the complete v1.8.10 27B RunPod suite.
 
-RCA Core v0.8.9 is **not frozen** until the exact v1.8.10 package passes a stable live full-suite rerun; TC12, TC17 and TC21 remain explicit anchors. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.10 is **not frozen** until the exact v1.8.11 package passes a stable live full-suite rerun. TC12 and TC17 are live-confirmed 27B anchors from v1.8.10; TC21 remains the primary RCA integration anchor. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.9.md`](RCA_CORE_ARCHITECTURE_v0.8.9.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.10.md`](RCA_CORE_ARCHITECTURE_v0.8.10.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
 
 ## 2. Current topology
 
@@ -24,7 +24,7 @@ Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.9.md`](RCA_C
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager       RCA Core v0.8.9       Storage / Sessions
+ Async Run Manager       RCA Core v0.8.10      Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -301,3 +301,8 @@ Session autosave preserves partial `result` data and augments it with `run_failu
 Semantic arbitration is not allowed to become an application-liveness dependency. Contract-invalid field patches are rejected atomically and the original semantic preparation remains in force. The raw arbitration attempt is retained and the pipeline continues with unresolved material semantics. Field omission is accepted only when every governing material issue for that exact field is explicitly unresolved.
 
 Independent verifier equality uses executable behavior semantics and normalized structured persistence scope, not descriptive prose fields.
+
+
+## v1.8.11 live-suite contract hardening
+
+The application topology is unchanged. v1.8.11 carries Core v0.8.10 and preserves v1.8.10 testcase isolation/session forensics. New core-facing observability persists arbitration contract-rejection reasons with the raw model attempt. The full v1.8.10 RunPod session completed 17/17 cases with 11/17 semantic PASS, proving batch continuation and TC12/TC17 behavior before this patch.

@@ -181,6 +181,40 @@ class RCAEvidencePacketBuilder:
                 else:
                     unresolved.append(base)
 
+        # Canonical direct observations are already deterministic structured
+        # evidence. Include the ones actually referenced by deterministic
+        # requirement results/route even when no language annotation exists, so
+        # RCA synthesis does not lose an explicit current-case mechanism fact.
+        referenced_evidence_ids: Set[str] = set(route.supporting_evidence_ids)
+        for rr in validated.requirement_results:
+            referenced_evidence_ids.update(rr.analysis.applicability_evidence_ids)
+            referenced_evidence_ids.update(rr.analysis.evaluation_evidence_ids)
+        already_packeted = {x.get("evidence_id", "") for x in verified_evidence}
+        for item in canonical.evidence_inventory:
+            if (
+                item.id in referenced_evidence_ids
+                and item.id not in already_packeted
+                and item.evidence_class == EvidenceClass.DIRECT_OBSERVATION
+                and item.signal_name.strip()
+                and item.signal_value.strip()
+                and item.observation_type.value != "UNSPECIFIED"
+            ):
+                verified_evidence.append({
+                    "evidence_id": item.id,
+                    "fact_id": "",
+                    "source_kind": "CANONICAL_STRUCTURAL_DIRECT_OBSERVATION",
+                    "subject": item.signal_name,
+                    "value": item.signal_value,
+                    "observation_type": item.observation_type.value,
+                    "timestamp_seconds": item.timestamp_seconds,
+                    "clock_id": item.clock_id,
+                    "transition_from": item.transition_from,
+                    "transition_to": item.transition_to,
+                    "event_coverage_complete": item.event_coverage_complete,
+                    "coverage_complete": item.coverage_complete,
+                })
+                already_packeted.add(item.id)
+
         deterministic_facts = []
         for rr in validated.requirement_results:
             deterministic_facts.append({

@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.10 API
+# RCA Analyst v1.8.11 API
 
 Base path: `/api/v1`.
 
@@ -59,7 +59,7 @@ The response contains `models` and the provider `catalog` where available. llama
 }
 ```
 
-`config_override` is optional. v1.8.10 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
+`config_override` is optional. v1.8.11 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
 
 Run types:
 
@@ -127,7 +127,7 @@ Browser bearer tokens are session-scoped and are not committed in frontend sourc
 `GET /runs` is the browser reconnect source of truth. Non-terminal runs are rediscovered after authentication; run status/pipeline/logs/metrics/result endpoints are then reattached through the existing run ID.
 
 
-## v1.8.10 batch failure semantics
+## Current batch failure semantics
 
 For `builtin_regression` and `bundle` runs, a testcase-local unexpected exception no longer changes the whole run to `FAILED`. The affected `result.cases[]` row becomes `FAILED`, its failure artifact is persisted, and the next testcase is attempted unless cancellation/run-level failure occurs.
 

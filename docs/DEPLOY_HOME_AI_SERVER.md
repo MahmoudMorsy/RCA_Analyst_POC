@@ -1,6 +1,6 @@
-# Home AI Server Deployment — v1.8.10
+# Home AI Server Deployment — v1.8.11
 
-The home server uses the **same** v1.8.10 application/container as Dell and RunPod. No hardware-specific code fork is allowed.
+The home server uses the **same** v1.8.11 application/container as Dell and RunPod. No hardware-specific code fork is allowed.
 
 Configuration differences are limited to:
 
@@ -25,7 +25,7 @@ python run_web.py
 
 A dual-GPU or different accelerator changes inference-server configuration, not RCA semantics.
 
-As on RunPod, v1.8.10 does not own external model-server lifecycle. Set real context/offload/batching in the model server and use the Web UI for discovery, testing, role routing and reproducible per-run snapshots.
+As on RunPod, v1.8.11 does not own external model-server lifecycle. Set real context/offload/batching in the model server and use the Web UI for discovery, testing, role routing and reproducible per-run snapshots.
 
 
 ## v1.8.9 browser reconnect
