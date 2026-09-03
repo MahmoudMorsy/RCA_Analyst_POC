@@ -1,4 +1,4 @@
-# RunPod Deployment Guide — v1.8.9
+# RunPod Deployment Guide — v1.8.10
 
 ## Persistent layout
 
@@ -29,7 +29,7 @@ Model IDs may be provided by environment defaults or current Web form/run config
 
 ## Model-server launch parameters
 
-v1.8.9 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
+v1.8.10 does **not** start or reconfigure external llama.cpp/vLLM/LM Studio processes. Context must therefore be set when each model server is launched.
 
 Example llama.cpp pattern:
 
@@ -53,7 +53,7 @@ For llama.cpp, inspect returned `n_ctx`.
 
 ## Critical Semantic Model Routing
 
-v1.8.9 can route critical semantic work without killing servers or patching code:
+v1.8.10 can route critical semantic work without killing servers or patching code:
 
 - Semantic Preparation → Small / Utility or Primary
 - Semantic Verification → Small / Utility or Primary
@@ -118,11 +118,11 @@ When a critical role uses Thinking Off, v1.8.7 sends `chat_template_kwargs.enabl
 
 For the next live acceptance run, route semantic preparation and independent verification to the Primary 27B, keep Thinking Off, run TC17 first, and only proceed to TC12 after TC17 meets the documented semantic target.
 
-## v1.8.9 live full-suite validation
+## v1.8.10 live full-suite validation
 
 Deploy the exact release ZIP and keep model-server context/routing/reasoning settings stable for the complete batch. Export the full run bundle after completion. Semantic acceptance must be assessed independently from transport execution status.
 
-Watch especially for: missing-ID recovery activity, structural completion counts, semantic arbitration frequency/retries, final semantic-integrity ERROR count, hypothesis provenance acceptance and per-stage token/runtime statistics. TC17 and TC12 remain explicit anchors inside the full-suite rerun. RCA Core v0.8.8 stays candidate until live acceptance succeeds.
+Watch especially for: missing-ID recovery activity, structural completion counts, semantic arbitration frequency/retries, final semantic-integrity ERROR count, hypothesis provenance acceptance and per-stage token/runtime statistics. TC17 and TC12 remain explicit anchors inside the full-suite rerun. RCA Core v0.8.9 stays candidate until live acceptance succeeds.
 
 
 ## v1.8.9 reconnect note

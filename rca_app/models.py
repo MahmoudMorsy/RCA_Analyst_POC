@@ -806,7 +806,7 @@ class SemanticIntegrityIssue(StrictModel):
 class SemanticArbitrationResponse(StrictModel):
     """One case-level 27B arbitration response containing issue-scoped repairs.
 
-    v0.8.8 uses field-level RequirementStructuralPatch objects so arbitration
+    v0.8.9 uses field-level RequirementStructuralPatch objects so arbitration
     cannot accidentally overwrite already-verified Requirement IR fields.
     ``requirement_irs`` remains accepted for missing-compiler-candidate recovery
     and backward-compatible session deserialization only.

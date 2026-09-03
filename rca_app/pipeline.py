@@ -96,7 +96,7 @@ class PipelineValidationError(RuntimeError):
 
 
 class RCAPipeline:
-    """v0.8.8 adaptive semantic-compiler RCA architecture.
+    """v0.8.9 adaptive semantic-compiler RCA architecture.
 
     Production v0.8 performs bounded semantic preparation that compiles
     free-form requirements into Requirement IR and annotates language-derived
@@ -902,85 +902,109 @@ class RCAPipeline:
                 stats.append(arb_response.stats)
                 attempts.append(self._make_aux_attempt(len(attempts)+1, "semantic_arbitration", "PRIMARY_SEMANTIC_ARBITRATION", arb_response))
                 semantic_arbitration = arb_response.parsed
-                self._validate_arbitration_response(
-                    semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets, material, semantic_preparation
-                )
-                semantic_preparation = self.semantic_arbitration_merger.apply(
-                    semantic_preparation, semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets
-                )
-                canonical.requirement_irs = copy.deepcopy(semantic_preparation.requirement_irs)
-                canonical.evidence_annotations = copy.deepcopy(semantic_preparation.evidence_annotations)
-
-                # Re-run the compact fast semantic verifier on repaired IRs. The
-                # 27B is not called again even if material ambiguity remains.
-                post_verify_prompt = self._semantic_verification_user_prompt(canonical, semantic_preparation)
-                self._emit_trace(
-                    trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "running",
-                    "Reconstructing requirement semantics independently after arbitration before deterministic execution.",
-                    input_value={
-                        "model_client": self._client_trace_descriptor(self.semantic_verification_client, "semantic_verification"),
-                        "verification_request": json.loads(post_verify_prompt),
-                    },
-                )
                 try:
-                    try:
-                        post_verify_response = self.semantic_verification_client.structured_repair(
-                            system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
-                            user_prompt=post_verify_prompt,
-                            response_model=RequirementSemanticVerificationBatch,
-                            schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
-                        )
-                    except AttributeError:
-                        post_verify_response = self.semantic_verification_client.structured_chat(
-                            system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
-                            user_prompt=post_verify_prompt,
-                            response_model=RequirementSemanticVerificationBatch,
-                            schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
-                        )
-                    stats.append(post_verify_response.stats)
-                    attempts.append(self._make_aux_attempt(
-                        len(attempts) + 1, "semantic_verification_post_arbitration",
-                        "SEMANTIC_VERIFIER", post_verify_response
-                    ))
-                    post_verification_issues = self._semantic_verification_issues(canonical, semantic_preparation, post_verify_response.parsed)
+                    self._validate_arbitration_response(
+                        semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets, material, semantic_preparation
+                    )
+                    semantic_preparation = self.semantic_arbitration_merger.apply(
+                        semantic_preparation, semantic_arbitration, arbitration_requirement_targets, arbitration_evidence_targets
+                    )
+                except ValueError as contract_exc:
+                    # Arbitration is a bounded semantic repair mechanism, not a
+                    # prerequisite for pipeline liveness. A contract-invalid
+                    # repair is rejected atomically and the original semantic
+                    # preparation plus material issues remain authoritative.
+                    # The raw model response was already persisted as an attempt.
+                    rejected = semantic_arbitration
+                    raw_llm_json = arb_response.raw_json
+                    raw_requirement_reasoning_json = arb_response.raw_json
+                    semantic_arbitration = None
                     self._emit_trace(
-                        trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification",
-                        "attention" if post_verification_issues else "complete",
-                        f"Verifier identified {len(post_verification_issues)} material mismatch(es) after arbitration.",
+                        trace, "08_semantic_arbitration", "27B Semantic Arbitration", "attention",
+                        "Arbitration response was rejected by the field-level repair contract; no patch was applied and unresolved semantics remain conservative.",
                         output_value={
-                            "verification": post_verify_response.parsed,
-                            "issues": [x.model_dump(mode="json") for x in post_verification_issues],
-                            "model_call": post_verify_response.stats,
+                            "error": str(contract_exc),
+                            "rejected_response": rejected,
+                            "model_call": arb_response.stats,
+                            "finish_reason": arb_response.finish_reason,
+                            "transport": arb_response.transport,
                         },
                     )
-                except ModelGatewayError as verify_exc:
-                    stats.append(verify_exc.stats)
-                    attempts.append(self._make_failed_attempt(
-                        len(attempts) + 1, "semantic_verification_post_arbitration",
-                        "SEMANTIC_VERIFIER", verify_exc
-                    ))
+                else:
+                    canonical.requirement_irs = copy.deepcopy(semantic_preparation.requirement_irs)
+                    canonical.evidence_annotations = copy.deepcopy(semantic_preparation.evidence_annotations)
+
+                if semantic_arbitration is not None:
+                    # Re-run the compact fast semantic verifier on repaired IRs. The
+                    # 27B is not called again even if material ambiguity remains.
+                    post_verify_prompt = self._semantic_verification_user_prompt(canonical, semantic_preparation)
                     self._emit_trace(
-                        trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "failed",
-                        "Post-arbitration semantic verification failed; repaired IR remains unverified.",
-                        output_value={"error": str(verify_exc), "finish_reason": verify_exc.finish_reason, "retry_diagnostics": verify_exc.retry_diagnostics},
+                        trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "running",
+                        "Reconstructing requirement semantics independently after arbitration before deterministic execution.",
+                        input_value={
+                            "model_client": self._client_trace_descriptor(self.semantic_verification_client, "semantic_verification"),
+                            "verification_request": json.loads(post_verify_prompt),
+                        },
                     )
-                    post_verification_issues = [
-                        SemanticIntegrityIssue(
-                            issue_id=f"VERIFY-POST-{idx:03d}",
-                            requirement_id=rid,
-                            description="Post-arbitration semantic verification failed; repaired IR remains unverified.",
-                            material_to_compliance=True,
+                    try:
+                        try:
+                            post_verify_response = self.semantic_verification_client.structured_repair(
+                                system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
+                                user_prompt=post_verify_prompt,
+                                response_model=RequirementSemanticVerificationBatch,
+                                schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
+                            )
+                        except AttributeError:
+                            post_verify_response = self.semantic_verification_client.structured_chat(
+                                system_prompt=REQUIREMENT_SEMANTIC_VERIFICATION_PROMPT,
+                                user_prompt=post_verify_prompt,
+                                response_model=RequirementSemanticVerificationBatch,
+                                schema_name="rca_requirement_semantic_verification_post_arbitration_v085",
+                            )
+                        stats.append(post_verify_response.stats)
+                        attempts.append(self._make_aux_attempt(
+                            len(attempts) + 1, "semantic_verification_post_arbitration",
+                            "SEMANTIC_VERIFIER", post_verify_response
+                        ))
+                        post_verification_issues = self._semantic_verification_issues(canonical, semantic_preparation, post_verify_response.parsed)
+                        self._emit_trace(
+                            trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification",
+                            "attention" if post_verification_issues else "complete",
+                            f"Verifier identified {len(post_verification_issues)} material mismatch(es) after arbitration.",
+                            output_value={
+                                "verification": post_verify_response.parsed,
+                                "issues": [x.model_dump(mode="json") for x in post_verification_issues],
+                                "model_call": post_verify_response.stats,
+                            },
                         )
-                        for idx, rid in enumerate(arbitrated_requirement_ids, start=1)
-                    ]
-                integrity_issues = self.semantic_integrity_checker.validate(canonical, semantic_preparation) + post_verification_issues
-                material = self.semantic_integrity_checker.material_issues(integrity_issues)
-                canonical.semantic_integrity_issues = copy.deepcopy(integrity_issues)
-                raw_llm_json = arb_response.raw_json
-                raw_requirement_reasoning_json = arb_response.raw_json
-                self._emit_trace(trace, "08_semantic_arbitration", "27B Semantic Arbitration", "attention" if material else "complete",
-                                 f"Arbitration completed; {len(material)} material issue(s) remain unresolved. No further 27B semantic retry is allowed.",
-                                 output_value=semantic_arbitration)
+                    except ModelGatewayError as verify_exc:
+                        stats.append(verify_exc.stats)
+                        attempts.append(self._make_failed_attempt(
+                            len(attempts) + 1, "semantic_verification_post_arbitration",
+                            "SEMANTIC_VERIFIER", verify_exc
+                        ))
+                        self._emit_trace(
+                            trace, "08b_post_arbitration_verification", "Post-Arbitration Semantic Verification", "failed",
+                            "Post-arbitration semantic verification failed; repaired IR remains unverified.",
+                            output_value={"error": str(verify_exc), "finish_reason": verify_exc.finish_reason, "retry_diagnostics": verify_exc.retry_diagnostics},
+                        )
+                        post_verification_issues = [
+                            SemanticIntegrityIssue(
+                                issue_id=f"VERIFY-POST-{idx:03d}",
+                                requirement_id=rid,
+                                description="Post-arbitration semantic verification failed; repaired IR remains unverified.",
+                                material_to_compliance=True,
+                            )
+                            for idx, rid in enumerate(arbitrated_requirement_ids, start=1)
+                        ]
+                    integrity_issues = self.semantic_integrity_checker.validate(canonical, semantic_preparation) + post_verification_issues
+                    material = self.semantic_integrity_checker.material_issues(integrity_issues)
+                    canonical.semantic_integrity_issues = copy.deepcopy(integrity_issues)
+                    raw_llm_json = arb_response.raw_json
+                    raw_requirement_reasoning_json = arb_response.raw_json
+                    self._emit_trace(trace, "08_semantic_arbitration", "27B Semantic Arbitration", "attention" if material else "complete",
+                                     f"Arbitration completed; {len(material)} material issue(s) remain unresolved. No further 27B semantic retry is allowed.",
+                                     output_value=semantic_arbitration)
             except ModelGatewayError as exc:
                 stats.append(exc.stats)
                 attempts.append(self._make_failed_attempt(len(attempts)+1, "semantic_arbitration", "PRIMARY_SEMANTIC_ARBITRATION", exc))
@@ -1105,9 +1129,9 @@ class RCAPipeline:
         report = self.formatter.format(validated)
         self._emit_trace(trace, "16_report_formatter", "11-Section Report Formatter", "complete", "Deterministic report generated.", output_value=report)
         self._emit_trace(trace, "17_final_output", "Final Output", "complete",
-                         "Validated v0.8.8 analysis is ready for session export.",
+                         "Validated v0.8.9 analysis is ready for session export.",
                          output_value=report)
-        progress("Complete", "v0.8.8 analysis completed.")
+        progress("Complete", "v0.8.9 analysis completed.")
 
         return PipelineResult(
             canonical_case=canonical,
@@ -1613,11 +1637,35 @@ class RCAPipeline:
         def event(x):
             return None if x is None else (cls._normalized_semantic_value(x.signal), cls._normalized_semantic_value(x.event), cls._normalized_semantic_value(x.value))
         def behavior(x):
-            return None if x is None else (cls._normalized_semantic_value(x.signal), x.operator.value, cls._normalized_semantic_value(x.value), cls._normalized_semantic_value(x.event), cls._normalized_semantic_value(x.process_description))
+            # Verification equality is executable-semantic equality. Descriptive
+            # prose such as process_description/source_phrase is useful for audit
+            # and rendering but must never create a false semantic mismatch.
+            return None if x is None else (
+                cls._normalized_semantic_value(x.signal),
+                x.operator.value,
+                cls._normalized_semantic_value(x.value),
+                cls._normalized_semantic_value(x.event),
+            )
         def timing(x):
             return None if x is None else (x.limit_ms, cls._normalized_semantic_value(x.relation))
         def persistence(x):
-            return None if x is None else (bool(x.required), cls._normalized_semantic_value(x.scope))
+            if x is None:
+                return None
+            raw = cls._normalized_semantic_value(x.scope)
+            token = raw.replace("-", "_").replace(" ", "_")
+            # RequirementPersistenceIR.scope is model-authored structured data,
+            # not authoritative source prose. Normalize only its structural
+            # category so equivalent wording such as "WHILE_CONDITION" and
+            # "while <compiled condition>" does not cause a false mismatch.
+            if token in {"while_condition", "while_the_condition_is_true"} or raw.startswith("while "):
+                scope_kind = "WHILE_CONDITION"
+            elif token in {"case_evaluated_interval", "complete_evaluated_interval"} or "evaluated interval" in raw:
+                scope_kind = "CASE_EVALUATED_INTERVAL"
+            elif raw:
+                scope_kind = "EXPLICIT_SCOPE"
+            else:
+                scope_kind = "UNSPECIFIED"
+            return (bool(x.required), scope_kind)
         rels = sorted((cls._normalized_semantic_value(x.relationship_type), cls._normalized_semantic_value(x.target_requirement_id)) for x in fp.relationships)
         return {
             "normative_type": fp.normative_type.value,
@@ -1738,8 +1786,9 @@ class RCAPipeline:
                 targets.setdefault(issue.requirement_id, set()).update(explicit)
         return {rid: sorted(fields) for rid, fields in targets.items() if fields}
 
-    @staticmethod
+    @classmethod
     def _validate_arbitration_response(
+        cls,
         response: SemanticArbitrationResponse,
         requirement_targets: dict[str, list[str]],
         evidence_targets: set[str],
@@ -1767,6 +1816,23 @@ class RCAPipeline:
             if issue.evidence_id:
                 issues_by_evidence.setdefault(issue.evidence_id, set()).add(issue.issue_id)
 
+        def field_issue_ids(requirement_id: str, field: str) -> set[str]:
+            """Return material issue IDs that specifically govern one target field.
+
+            Explicit verifier target_fields are authoritative. Structural defects
+            use the same internal field-target derivation already used to build
+            the arbitration request. This never interprets requirement prose.
+            """
+            out: set[str] = set()
+            for issue in material_issues:
+                if issue.requirement_id != requirement_id:
+                    continue
+                explicit = set(issue.target_fields or [])
+                inferred = set(cls._structural_completion_targets(preparation, [issue]).get(requirement_id, []))
+                if field in explicit or field in inferred:
+                    out.add(issue.issue_id)
+            return out
+
         existing_ids = {x.requirement_id for x in preparation.requirement_irs}
         allowed_fields = {
             "normative_type", "condition", "trigger", "required_behavior",
@@ -1791,8 +1857,16 @@ class RCAPipeline:
             if unexpected:
                 raise ValueError(f"Arbitration patch attempted untargeted fields for {rid}: {sorted(unexpected)}")
             missing = expected - supplied
-            if missing:
-                raise ValueError(f"Arbitration patch omitted targeted fields for {rid}: {sorted(missing)}")
+            invalid_missing = set()
+            for field in missing:
+                governed = field_issue_ids(rid, field)
+                if not (governed and governed.issubset(unresolved)):
+                    invalid_missing.add(field)
+            if invalid_missing:
+                raise ValueError(
+                    f"Arbitration patch omitted targeted fields for {rid}: {sorted(invalid_missing)}; "
+                    "each omitted field must have all governing material issue IDs explicitly listed in unresolved_issue_ids"
+                )
 
         # A targeted existing requirement may omit a field patch only when a
         # legacy full IR supplies the target fields or all current material

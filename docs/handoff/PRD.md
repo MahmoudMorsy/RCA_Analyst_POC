@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.9  
-**Current RCA semantic-core baseline:** v0.8.8 candidate  
-**Validation status:** automated release gates are required. RCA Core v0.8.8 remains unfrozen until the exact v1.8.9 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors inside that rerun.
+**Current application release:** v1.8.10  
+**Current RCA semantic-core baseline:** v0.8.9 candidate  
+**Validation status:** automated release gates are required. RCA Core v0.8.9 remains unfrozen until the exact v1.8.10 package passes a stable live full-suite rerun. TC12, TC17 and TC21 remain explicit semantic/integration anchors inside that rerun.
 
 ## 1. Product vision
 
@@ -97,7 +97,7 @@ Preserve all established rules, including:
 - transport-valid IR is not automatically executable IR;
 - same-signal overlap alone is insufficient evidence materiality.
 
-## 7. Current RCA Core v0.8.8 pipeline
+## 7. Current RCA Core v0.8.9 pipeline
 
 ```text
 RAW CASE
@@ -159,19 +159,19 @@ The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic
 
 None of these changes add Python natural-language meaning extraction or weaken evidence/compliance conservatism.
 
-## 9. Current application architecture v1.8.9
+## 9. Current application architecture v1.8.10
 
 ```text
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.8
+→ RCA Core v0.8.9
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.9 retains all v1.8.6/v1.8.7 Web/model improvements and adds authoritative testcase lifecycle:
+v1.8.10 retains all v1.8.9 Web/model/reconnect improvements and adds testcase failure containment plus richer failure/session forensics:
 
 - case enters the Tests list as `RUNNING` before pipeline execution;
 - the same lifecycle row updates to PASS/FAILED/CANCELLED;
@@ -238,6 +238,8 @@ Every release must:
 11. record SHA-256.
 
 
-## v1.8.9 acceptance delta
+## v1.8.10 acceptance delta
 
-The application must automatically rediscover still-running backend runs after browser reconnect; live pipeline inspection state must survive polling. RCA Core must allow VERIFIED facts to participate in any structurally matching Requirement IR, require all targeted structural fields, merge arbitration atomically, route known diagnostic/history classes canonically, retain unresolved normative context for RCA, and validate hypothesis machine IDs independently from display references.
+In addition to all v1.8.9 requirements, sequential regression/bundle execution must continue after a testcase-local unexpected exception. Pipeline construction is inside testcase isolation. Generic failure records must preserve exception type/message/traceback and partial pipeline. Session export must preserve partial results plus any run-level failure.
+
+RCA Core arbitration is a repair mechanism, not a liveness dependency: a contract-invalid arbitration response is rejected atomically, its raw attempt is retained, material issues remain unresolved, and compliance continues conservatively. A target field may be omitted only when every material issue governing that field is explicitly unresolved. Independent verifier equality must compare executable semantics rather than descriptive `process_description` text, and persistence scope comparison must use normalized structured categories rather than arbitrary model wording.

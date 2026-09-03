@@ -564,7 +564,7 @@ IMPORTANT BOUNDARIES
 
 
 REQUIREMENT_COMPILATION_V086_PROMPT = r"""
-You are the v0.8.8 Requirement Semantic Compiler for an automotive RCA pipeline.
+You are the v0.8.9 Requirement Semantic Compiler for an automotive RCA pipeline.
 Return only the requested RequirementCompilationBatch schema.
 
 You receive requirements_to_compile plus reference_requirements for context.
@@ -604,7 +604,7 @@ not assign APPLICABLE/NOT APPLICABLE/SATISFIED/VIOLATED.
 
 
 REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT = r"""
-You are the v0.8.8 targeted Requirement IR structural completer.
+You are the v0.8.9 targeted Requirement IR structural completer.
 Return only the requested RequirementStructuralPatchBatch schema.
 
 Python has already identified exact structured fields that are transport-valid but
@@ -630,7 +630,7 @@ Do not calculate applicability, compliance, timing from evidence, hypotheses, or
 
 
 EVIDENCE_ANNOTATION_V086_PROMPT = r"""
-You are the v0.8.8 Evidence Semantic Annotator for an automotive RCA pipeline.
+You are the v0.8.9 Evidence Semantic Annotator for an automotive RCA pipeline.
 Return only the requested EvidenceAnnotationBatch schema.
 
 Annotate only evidence_requiring_language_interpretation. Structured timestamped
@@ -717,7 +717,7 @@ misrepresented. Do not calculate compliance and do not repair the IR.
 
 
 SEMANTIC_ARBITRATION_PROMPT = r"""
-You are the single case-level semantic arbitrator for v0.8.8.
+You are the single case-level semantic arbitrator for v0.8.9.
 Return only the requested SemanticArbitrationResponse schema.
 
 Python detected MATERIAL semantic integrity problems after independent semantic

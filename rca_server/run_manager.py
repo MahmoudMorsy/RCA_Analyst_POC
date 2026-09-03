@@ -4,6 +4,7 @@ import copy
 import json
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -264,9 +265,13 @@ class RunManager:
             self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
             self._persist_case_lifecycle(runtime)
             self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: STARTED")
-            pipeline = self.pipeline_factory.build(runtime.config, runtime.cancellation)
-            runtime.pipeline = pipeline
+            pipeline = None
             try:
+                # Pipeline construction is testcase-local. A provider/config
+                # construction failure for one case must not abort the remaining
+                # regression bundle.
+                pipeline = self.pipeline_factory.build(runtime.config, runtime.cancellation)
+                runtime.pipeline = pipeline
                 result = pipeline.run(
                     raw,
                     progress=lambda s, d, cid=case_id: self._progress(runtime, f"{cid} / {s}", d),
@@ -302,6 +307,18 @@ class RunManager:
                     "result_available": False,
                 })
                 raise
+            except Exception as exc:
+                # Unexpected testcase failures are isolated from the batch.
+                # Preserve enough forensic detail to debug the exact boundary,
+                # mark only this testcase FAILED, then continue with the suite.
+                failure = self._unexpected_case_failure_payload(runtime, case_id, exc)
+                self.storage.write_json(f"runs/{runtime.summary.run_id}/cases/{case_id}/failure.json", failure)
+                record.update({
+                    "execution_status": "FAILED",
+                    "semantic_acceptance": "NOT_EVALUATED",
+                    "failure": failure,
+                    "result_available": True,
+                })
             finally:
                 runtime.pipeline = None
                 if record["execution_status"] != "RUNNING":
@@ -319,6 +336,22 @@ class RunManager:
                 self.storage.write_json(f"runs/{runtime.summary.run_id}/result.json", runtime.result)
                 self._persist_case_lifecycle(runtime)
             self._progress(runtime, "Sequential Batch", f"[{index}/{total}] {case_id}: {record['execution_status']}")
+
+    def _unexpected_case_failure_payload(self, runtime: RuntimeRun, case_id: str, exc: Exception) -> dict[str, Any]:
+        prefix = f"{case_id}:"
+        partial_pipeline = [
+            stage.model_dump(mode="json")
+            for stage_id, stage in runtime.stages.items()
+            if str(stage_id).startswith(prefix)
+        ]
+        return {
+            "status": "FAILED",
+            "case_id": case_id,
+            "exception_type": type(exc).__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+            "partial_pipeline": partial_pipeline,
+        }
 
     def _case_statistics(self, runtime: RuntimeRun, case_id: str, elapsed_seconds: float, record: dict[str, Any]) -> dict[str, Any]:
         calls = [x for x in runtime.metrics.get("model_calls", []) if x.get("case_id") == case_id]
@@ -610,7 +643,16 @@ class RunManager:
         self.storage.write_json(f"runs/{runtime.summary.run_id}/metrics.json", runtime.metrics)
 
     def _auto_session(self, runtime: RuntimeRun) -> None:
-        payload = runtime.result or runtime.failure or {"status": runtime.summary.status.value, "message": runtime.summary.error}
+        if runtime.result is not None:
+            payload = copy.deepcopy(runtime.result)
+            # Preserve the existing result/batch envelope shape while ensuring a
+            # run-level failure can never hide behind partial testcase results.
+            if runtime.failure is not None and isinstance(payload, dict):
+                payload["run_failure"] = copy.deepcopy(runtime.failure)
+        elif runtime.failure is not None:
+            payload = copy.deepcopy(runtime.failure)
+        else:
+            payload = {"status": runtime.summary.status.value, "message": runtime.summary.error}
         session_id = runtime.summary.run_id
         envelope = self.sessions.make_envelope(
             session_id=session_id,

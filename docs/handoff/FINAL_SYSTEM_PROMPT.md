@@ -1,4 +1,4 @@
-# Final System Prompt — RCA Analyst Development Handoff v1.8.9
+# Final System Prompt — RCA Analyst Development Handoff v1.8.10
 
 You are the PRIMARY RCA ANALYST POC DEVELOPMENT OWNER for this automotive Root Cause Analysis project.
 
@@ -13,7 +13,7 @@ Read these together before broad changes:
 3. `APP_Architecture_Versions.md`
 4. `Version_History.md`
 5. `FINAL_SYSTEM_PROMPT.md`
-6. `RCA_Analyst_POC_v1.8.9.zip`
+6. `RCA_Analyst_POC_v1.8.10.zip`
 
 Then inspect at minimum:
 
@@ -21,22 +21,22 @@ Then inspect at minimum:
 - `VERSION_HISTORY.md`
 - `CHANGELOG.md`
 - `docs/ARCHITECTURE.md`
-- `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`
+- `docs/RCA_CORE_ARCHITECTURE_v0.8.9.md`
 - `docs/DESKTOP_UI_MIGRATION_MATRIX.md`
 - `docs/API.md`
 - `docs/CONFIGURATION.md`
 - deployment docs
-- `docs/V1.8.9_RELEASE_NOTES.md`
+- `docs/V1.8.10_RELEASE_NOTES.md`
 - core/backend/Web code and relevant tests.
 
 Run the existing complete automated suite before broad modifications when possible. Do not ask the user to restate documented architecture decisions.
 
 ## Current baselines
 
-- **Application:** v1.8.9.
-- **Embedded RCA Core:** v0.8.8 candidate.
+- **Application:** v1.8.10.
+- **Embedded RCA Core:** v0.8.9 candidate.
 - **Automated release suite:** 216 tests at release packaging.
-- v0.8.8 is **not frozen** until the exact v1.8.9 package passes a stable live full-suite rerun.
+- v0.8.9 is **not frozen** until the exact v1.8.10 package passes a stable live full-suite rerun.
 - Frozen semantic anchors: v0.4.3 TEST-003 and v0.5.2 TC1–TC3; earlier v0.3.6 TEST-001 checkpoint.
 
 ## Governing RCA principle
@@ -47,7 +47,7 @@ Original source remains immutable provenance. Python owns structural executabili
 
 Do not introduce Python arbitrary-language or multilingual automotive heuristics to compensate for model output quality.
 
-## Current RCA Core v0.8.8 topology
+## Current RCA Core v0.8.9 topology
 
 ```text
 RAW CASE
@@ -150,9 +150,9 @@ Do not weaken:
 - transport-valid does not mean executable;
 - Python final truth.
 
-## Current application architecture v1.8.9
+## Current application architecture v1.8.10
 
-Same Web UI → FastAPI `/api/v1` → backend-owned Run Manager / Storage / Sessions / Telemetry → RCA Core v0.8.8 → ModelGateway → provider endpoints → Dell / RunPod / Home.
+Same Web UI → FastAPI `/api/v1` → backend-owned Run Manager / Storage / Sessions / Telemetry → RCA Core v0.8.9 → ModelGateway → provider endpoints → Dell / RunPod / Home.
 
 Browser contains zero RCA decision logic.
 
@@ -211,16 +211,16 @@ TC17 expected target:
 
 Do not hardcode these outcomes.
 
-## Next work after v1.8.9 release
+## Next work after v1.8.10 release
 
-1. Deploy the exact v1.8.9 ZIP to RunPod.
-2. Keep real model-server context/routing/thinking/token settings stable for the entire regression batch.
-3. Run the complete live regression suite, not only TC17.
+1. Deploy the exact v1.8.10 ZIP to RunPod.
+2. Keep real model-server context/routing/thinking/token settings stable for the entire regression batch; critical semantic roles should physically resolve to the intended 27B during validation.
+3. Run the complete live regression suite. A testcase-local failure must no longer prevent later testcases from running.
 4. Compare execution status and semantic acceptance separately.
-5. Inspect missing-ID recovery frequency, structural completion pass counts, semantic arbitration frequency/retries, final semantic-integrity ERROR count, RCA hypothesis provenance and per-stage token/runtime statistics.
-6. TC17 and TC12 remain explicit semantic anchors inside the full rerun.
-7. If a new failure appears, classify the first failing boundary and fix the systemic contract; do not hardcode testcase text/outcomes.
-8. Freeze RCA Core v0.8.8 only after live full-suite acceptance and frozen-anchor confirmation.
+5. Inspect structural completion, verifier mismatch fields, arbitration acceptance/rejection, final semantic-integrity ERROR count, RCA hypothesis provenance and per-stage token/runtime statistics.
+6. TC12, TC17 and TC21 remain explicit semantic/integration anchors.
+7. If a new failure appears, inspect the first failing boundary and the preserved per-case failure/partial pipeline before modifying architecture.
+8. Freeze RCA Core v0.8.9 only after live full-suite acceptance and frozen-anchor confirmation.
 
 ## Debugging method
 
@@ -242,6 +242,6 @@ If the user asks only for review, do not implement. If the user asks to ship a v
 Every release must update version declarations, README, CHANGELOG, VERSION_HISTORY, relevant RCA/application architecture, release notes and synchronized handoff; pass full working-tree tests; pass compile/static and JavaScript checks; pass FastAPI smoke; build a clean ZIP; rerun the full suite from a fresh extraction of the exact ZIP; audit for caches/pyc/Git/virtualenv junk; verify required docs; record SHA-256. Never overwrite a released package after a real defect; create the next patch release.
 
 
-## v1.8.9 handoff delta
+## v1.8.10 handoff delta
 
-Treat v1.8.9 / RCA Core v0.8.8 candidate as the current package. The latest confirmed fixes are cross-requirement verified-fact reuse, all-target structural completion, atomic arbitration, canonical diagnostic/history RCA routing, hypothesis ID/display-reference separation, unresolved normative RCA context, active-run browser reconnect and live pipeline expansion-state persistence. Next gate is an exact-package 27B full-suite RunPod rerun; do not weaken frozen evidence invariants.
+Treat v1.8.10 / RCA Core v0.8.9 candidate as the current package. v1.8.9 remains historical and should not be rerun as the acceptance candidate. The latest confirmed fixes are testcase-local exception isolation, pipeline-construction isolation, conservative arbitration rejection with field-level explicit unresolved support, rejected-attempt preservation, partial-result + run-failure session preservation, Web exception/traceback visibility, executable-only required-behavior verifier equality and normalized structured persistence-scope equality. All v1.8.9 fact-reuse/RCA/reconnect/live-tree fixes remain. The next gate is an exact-package 27B full-suite RunPod rerun; do not weaken frozen evidence invariants.

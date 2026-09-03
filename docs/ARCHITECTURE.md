@@ -1,15 +1,15 @@
-# RCA Analyst v1.8.9 Application Architecture
+# RCA Analyst v1.8.10 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.9  
-**Embedded RCA Core:** v0.8.8 candidate
+**Application version:** v1.8.10  
+**Embedded RCA Core:** v0.8.9 candidate
 
-v1.8.9 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.6/v1.8.7 observability/provider repairs. It carries RCA Core v0.8.8, a full-suite semantic-contract hardening release: compiler completeness recovery, provenance-aware targeted completion, independent normative-polarity verification, safer source grounding, authoritative evidence materiality, issue-scoped arbitration and verified semantic-fact RCA provenance.
+v1.8.10 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.9 reconnect/live-view improvements. It carries RCA Core v0.8.9, which adds arbitration failure containment and verifier-equivalence hardening after the first exact-package v1.8.9 27B suite stopped at TEST-007.
 
-RCA Core v0.8.8 is **not frozen** until the exact v1.8.9 package passes a stable live full-suite rerun; TC17 and TC12 remain explicit anchors. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.9 is **not frozen** until the exact v1.8.10 package passes a stable live full-suite rerun; TC12, TC17 and TC21 remain explicit anchors. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
-Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.8.md`](RCA_CORE_ARCHITECTURE_v0.8.8.md). Historical v0.8.4 architecture remains packaged separately.
+Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.9.md`](RCA_CORE_ARCHITECTURE_v0.8.9.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
 
 ## 2. Current topology
 
@@ -24,7 +24,7 @@ Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.8.md`](RCA_C
        ┌────────────────────────┼────────────────────────┐
        │                        │                        │
        ▼                        ▼                        ▼
- Async Run Manager       RCA Core v0.8.8       Storage / Sessions
+ Async Run Manager       RCA Core v0.8.9       Storage / Sessions
        │                        │                        │
        │                        ▼                        │
        │                   ModelGateway                 │
@@ -269,11 +269,11 @@ Application defects must not be solved by weakening RCA semantics. Semantic chan
 ## 15. Python 3.9 compatibility
 
 The server layer continues to avoid runtime-evaluated PEP 604 annotations in FastAPI/Pydantic paths so the supported Dell Python 3.9 environment remains valid.
-## 16. v1.8.8 full-suite hardening
+## 16. v1.8.9 deterministic integration and testcase lifecycle hardening
 
 v1.8.8 preserved the Web/FastAPI modular-monolith boundary and added two coordinated contracts.
 
-**RCA Core v0.8.8:** compiler batches are completeness-checked with one bounded missing-ID recovery; provenance/source-clause inventories become structural-completion targets; independent verification reconstructs normative polarity; source grounding tolerates formatting-only differences and explicit source-order ellipsis; evidence materiality requires an authoritative structured dependency; arbitration receives an issue-scoped exact source packet; VERIFIED semantic fact IDs are accepted as RCA provenance. Python remains deterministic compliance authority.
+**RCA Core v0.8.8 (carried by v1.8.9):** compiler batches are completeness-checked with one bounded missing-ID recovery; provenance/source-clause inventories become structural-completion targets; independent verification reconstructs normative polarity; source grounding tolerates formatting-only differences and explicit source-order ellipsis; evidence materiality requires an authoritative structured dependency; arbitration receives an issue-scoped exact source packet; VERIFIED semantic fact IDs are accepted as RCA provenance. Python remains deterministic compliance authority.
 
 **Testcase lifecycle:** the Run Manager registers each testcase as RUNNING before pipeline execution and updates the same record to PASS/FAILED/CANCELLED. `/runs/{run_id}/result` therefore exposes the current case immediately for both single and batch runs. The Web Tests selector is a lifecycle selector, not merely a completed-results selector.
 
@@ -286,3 +286,18 @@ A running testcase can be selected after browsing completed cases. Live Pipeline
 The backend Run Manager remains authoritative for run lifecycle. On connection, the Web client reads `/runs` and rediscoveries active non-terminal runs rather than relying on browser state. A live run can therefore survive tab closure/reopening as long as the backend process itself remains alive.
 
 Structured pipeline Input/Output rendering preserves UI state using stable semantic tree paths scoped by profile/run/testcase/stage/view. Polling can replace live data without collapsing objects the user is inspecting. Selected testcase and selected stage are stored per run.
+
+
+## v1.8.10 testcase failure containment
+
+Sequential testcase execution treats the testcase as the isolation unit. Pipeline construction and execution are inside one testcase-local `try` boundary. `AnalysisCancelled` remains run-level and stops the suite; `PipelineValidationError` and unexpected testcase exceptions are persisted on the affected case and execution continues.
+
+Unexpected failures persist exception type/message/traceback plus the partial testcase pipeline. A batch is `COMPLETED` when all requested testcase slots were attempted; testcase `FAILED` and semantic acceptance remain independent dimensions.
+
+Session autosave preserves partial `result` data and augments it with `run_failure` when an unrecoverable run-level failure also exists.
+
+## v1.8.10 semantic-repair containment
+
+Semantic arbitration is not allowed to become an application-liveness dependency. Contract-invalid field patches are rejected atomically and the original semantic preparation remains in force. The raw arbitration attempt is retained and the pipeline continues with unresolved material semantics. Field omission is accepted only when every governing material issue for that exact field is explicitly unresolved.
+
+Independent verifier equality uses executable behavior semantics and normalized structured persistence scope, not descriptive prose fields.

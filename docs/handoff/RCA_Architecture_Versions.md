@@ -1,6 +1,6 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.9:** RCA Core v0.8.8 candidate.
+**Current RCA architecture carried by application v1.8.10:** RCA Core v0.8.9 candidate.
 
 ## 1. Persistent invariants
 
@@ -122,11 +122,24 @@ Do not weaken state/transition/interval distinctions, point-vs-scope semantics, 
 
 ## 13. Validation status
 
-RCA Core v0.8.8 is a **candidate**, not frozen.
+RCA Core v0.8.9 is a **candidate**, not frozen.
 
-Deploy the exact v1.8.9 package and rerun the complete regression bundle with stable model settings. TC17 and TC12 remain explicit semantic anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
+Deploy the exact v1.8.10 package and rerun the complete regression bundle with stable model settings. TC12, TC17 and TC21 remain explicit semantic/integration anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
 
 
 ## A9 — v0.8.8 deterministic integration hardening
 
 Controlled 27B reruns isolated deterministic/integration failures after semantic interpretation became correct. v0.8.8 removes requirement-ID execution whitelisting on verified facts, enforces all-target completion, field-atomic arbitration, advisory free-text case ambiguity, canonical RCA source classification, unresolved requirement context and machine-ID hypothesis provenance.
+
+
+## A10 — v0.8.9 arbitration containment and verifier equivalence
+
+The first exact v1.8.9 27B suite attempt exposed a TEST-007 field-contract exception in arbitration and false verifier mismatches in cases such as TEST-012. v0.8.9 keeps v0.8.8 semantics and changes the following contracts:
+
+- schema-valid but field-contract-invalid arbitration is rejected atomically and leaves material semantics unresolved instead of throwing out of the RCA pipeline;
+- omitted arbitration fields are allowed only when all material issues governing that exact field are explicitly listed in `unresolved_issue_ids`;
+- raw rejected arbitration output is retained in attempts/trace output;
+- required-behavior verifier equality is executable `(signal, operator, value, event)` only; descriptive process/source text and IDs are audit metadata, not semantic equality;
+- persistence scope uses coarse structural normalization of the already-structured scope field, avoiding arbitrary generated-string mismatch without parsing authoritative requirement prose.
+
+Frozen evidence/compliance invariants are unchanged.

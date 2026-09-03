@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.9 Configuration Reference
+# RCA Analyst v1.8.10 Configuration Reference
 
 ## Top-level application configuration
 
@@ -24,7 +24,7 @@ Each role contains:
 - `transport`
 - `api_token_env`
 
-`context_size` is expected/provider metadata in v1.8.9; it does not reconfigure an already-running external model server.
+`context_size` is expected/provider metadata in v1.8.10; it does not reconfigure an already-running external model server.
 
 ### `model_routing` — new in v1.8.7
 
@@ -92,7 +92,7 @@ Deployment variables include:
 - `RCA_SMALL_PROVIDER`
 - model API-token environment variables such as `LM_API_TOKEN`.
 
-The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.9 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
+The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.10 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
 
 A Web-started run additionally supplies the current form through `config_override`. That run snapshot is authoritative for that run and is persisted in `config_snapshot.json`/session metadata.
 
@@ -104,7 +104,7 @@ There are three distinct concepts:
 2. actual server runtime context, e.g. llama.cpp `-c 8192`;
 3. RCA configuration metadata/expectation.
 
-Only (2) controls the running server's real context window. v1.8.9 model discovery displays provider-advertised runtime context when available so mismatches are visible.
+Only (2) controls the running server's real context window. v1.8.10 model discovery displays provider-advertised runtime context when available so mismatches are visible.
 
 
 ## v1.8.9 Web state

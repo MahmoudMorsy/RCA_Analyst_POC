@@ -1,11 +1,16 @@
 # RCA Analyst Version History
 
-## Current release — v1.8.9 / RCA Core v0.8.8 candidate
+## Current release — v1.8.10 / RCA Core v0.8.9 candidate
 
-- Controlled 27B reruns established TEST-006 and TEST-012 as clean controls and isolated remaining TEST-017/TEST-021 core integration defects.
-- v0.8.8 fixes deterministic fact reuse, all-target completion, atomic arbitration, RCA packet classification/provenance and unresolved requirement visibility.
-- v1.8.9 fixes active-run browser reconnect and live pipeline expansion/selection persistence.
-- Automated release suite: **225 tests** before packaging; live full-suite validation remains required before freezing v0.8.8.
+- The first exact v1.8.9 27B full-suite attempt stopped at TEST-007 because an arbitration field-contract `ValueError` escaped testcase scope; later cases were never executed.
+- v1.8.10 isolates unexpected testcase failures so a bundle continues, preserves forensic exception/traceback/partial-pipeline data, and keeps partial results plus run-level failure metadata in sessions.
+- RCA Core v0.8.9 treats invalid arbitration repair as conservative unresolved semantics rather than a pipeline crash, supports field-level explicit unresolved decisions, and persists rejected arbitration output.
+- Independent semantic verification now compares executable behavior semantics rather than descriptive `process_description` text and normalizes persistence scope categories instead of arbitrary wording.
+- Release validation: **232 passed** in the working tree and **232 passed** from a clean fresh extraction of the exact final ZIP; live full-suite validation remains required before freezing v0.8.9.
+
+## v1.8.9 → v1.8.10
+
+See `docs/V1.8.10_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.9.md`.
 
 ## v1.8.8 → v1.8.9
 
@@ -13,9 +18,9 @@ See `docs/V1.8.9_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`.
 
 ## Current version model
 
-- **Application version:** v1.8.8 — full-suite semantic-contract and live testcase-lifecycle hardening release on the v1.8.7 baseline.
-- **Embedded RCA Core:** v0.8.7 candidate — full-suite compiler completeness, provenance, materiality, grounding, verification and RCA provenance hardening.
-- **Validation:** automated release gates must pass; RCA Core v0.8.7 remains unfrozen until the exact v1.8.8 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors.
+- **Application version:** v1.8.10 — testcase failure containment, failure/session forensics and Web failure-detail hardening on the v1.8.9 application baseline.
+- **Embedded RCA Core:** v0.8.9 candidate — arbitration containment plus executable-semantic verifier-equivalence hardening on v0.8.8.
+- **Validation:** automated release gates must pass; RCA Core v0.8.9 remains unfrozen until the exact v1.8.10 package passes a stable live full-suite rerun. TC12, TC17 and TC21 remain explicit anchors.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 ## v1.8.7 → v1.8.8

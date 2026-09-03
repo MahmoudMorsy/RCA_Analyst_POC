@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.8.10
+
+- Promote application to **v1.8.10** with embedded **RCA Core v0.8.9 candidate**.
+- Isolate generic testcase exceptions and pipeline-construction failures so sequential regression/bundle execution continues.
+- Preserve generic testcase exception type/message/traceback/partial pipeline and keep partial result plus run-level failure metadata in session exports.
+- Reject invalid semantic-arbitration responses atomically and continue conservatively rather than crashing the RCA pipeline.
+- Allow an omitted arbitration target field only when all material issue IDs governing that field are explicitly unresolved.
+- Persist rejected arbitration responses through pipeline attempts/trace output.
+- Remove descriptive `process_description` from semantic-verifier equality and normalize structured persistence-scope categories.
+- Surface testcase exception/traceback details in the Web result views.
+- Add v1.8.10 regressions; release suite is **232 tests**.
+
 ## 1.8.9
 
 - Promote application to **v1.8.9** with embedded **RCA Core v0.8.8 candidate**.

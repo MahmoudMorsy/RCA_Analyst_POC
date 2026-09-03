@@ -86,7 +86,7 @@ function renderCapabilities(){
 function renderEnvironmentOverrides(){
   const overrides=state.capabilities?.environment_overrides||{},box=$('modelOverrideWarning');const rows=Object.entries(overrides);
   if(!rows.length){box.textContent='';box.hidden=true;box.classList.remove('show');return;}box.hidden=false;box.classList.add('show');
-  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.9 run-specific configuration overrides remain authoritative for the run you start.</span>`;
+  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.10 run-specific configuration overrides remain authoritative for the run you start.</span>`;
 }
 
 const configMap={
@@ -172,6 +172,14 @@ function renderBatchSummary(result){
 }
 function fmtSec(v){if(v==null||Number.isNaN(Number(v)))return '—';const n=Number(v);if(n<60)return `${n.toFixed(2)} s`;return `${Math.floor(n/60)}m ${(n%60).toFixed(1)}s`;}
 function selectedCasePayload(record){return record?.result||record?.failure||null;}
+function failureText(failure){
+  if(!failure)return 'FAILED';
+  const lines=['FAILED'];
+  if(failure.exception_type)lines.push(`Type: ${failure.exception_type}`);
+  if(failure.message)lines.push(`Message: ${failure.message}`);
+  if(failure.traceback)lines.push('', 'Traceback:', failure.traceback);
+  return lines.join('\n');
+}
 function renderRun(s,pipeline,logs,metrics,resultWrap){
   $('runSummary').textContent=s.run_id;$('currentStage').textContent=s.current_stage||s.status;$('progressDetail').textContent=s.progress_detail||s.error||'';const badge=$('runStateBadge');badge.textContent=s.status;badge.className=`badge ${s.status.toLowerCase()}`;$('stopBtn').disabled=!['QUEUED','INITIALIZING','RUNNING','CANCELLING'].includes(s.status);$('downloadReportBtn').disabled=s.status!=='COMPLETED'||s.run_type!=='single';$('downloadSessionBtn').disabled=!s.session_id;
   const result=resultWrap?.result,failure=resultWrap?.failure,isBatch=s.run_type!=='single',rows=caseRows(resultWrap,s);updateCaseSelector(rows,isBatch?result:null);
@@ -181,14 +189,14 @@ function renderRun(s,pipeline,logs,metrics,resultWrap){
   if(isBatch&&result){renderBatchSummary(result);renderCaseResultViews(selected,selectedCasePayload(selected),metrics,filteredPipeline);}
   else if(rows.length){$('batchView').replaceChildren();renderCaseResultViews(selected,selectedCasePayload(selected),metrics,filteredPipeline);}
   else if(result){$('batchView').replaceChildren();renderSingleResultViews(result,metrics,filteredPipeline);}
-  else if(failure){$('reportView').textContent=`FAILED\n\n${failure.message||''}`;renderStructured($('validationView'),failure.validated?.issues||failure);renderStructured($('canonicalView'),failure.canonical_case);renderStructured($('jsonView'),failure);renderStructured($('attemptsView'),failure.attempts||[]);renderStructured($('repairView'),failure.repair_log||[]);renderStats(metrics,null,filteredPipeline);}
+  else if(failure){$('reportView').textContent=failureText(failure);renderStructured($('validationView'),failure.validated?.issues||failure);renderStructured($('canonicalView'),failure.canonical_case);renderStructured($('jsonView'),failure);renderStructured($('attemptsView'),failure.attempts||[]);renderStructured($('repairView'),failure.repair_log||[]);renderStats(metrics,null,filteredPipeline);}
   else {if(isBatch)renderBatchSummary(result||{cases:[]});renderStats(metrics,null,filteredPipeline);}
 }
 function renderSingleResultViews(result,metrics,pipeline){$('reportView').textContent=result.final_report||'No final report.';renderStructured($('validationView'),result.validated?.issues||[]);renderStructured($('canonicalView'),result.canonical_case);renderStructured($('jsonView'),result);renderStructured($('attemptsView'),result.attempts||[]);renderStructured($('repairView'),result.repair_log||[]);renderStats(metrics,null,pipeline);}
 function renderCaseResultViews(c,payload,metrics,pipeline){
   if(!c){$('reportView').textContent='No testcase selected.';for(const id of ['validationView','canonicalView','jsonView','attemptsView','repairView'])renderStructured($(id),null);renderStats(metrics,null,pipeline);return;}
   if(c.result){$('reportView').textContent=c.result.final_report||'No final report.';renderStructured($('validationView'),c.result.validated?.issues||[]);renderStructured($('canonicalView'),c.result.canonical_case);renderStructured($('jsonView'),c.result);renderStructured($('attemptsView'),c.result.attempts||[]);renderStructured($('repairView'),c.result.repair_log||[]);}
-  else if(c.failure){$('reportView').textContent=`FAILED\n\n${c.failure?.message||''}`;renderStructured($('validationView'),c.failure?.validated?.issues||c.failure);renderStructured($('canonicalView'),c.failure?.canonical_case);renderStructured($('jsonView'),c.failure);renderStructured($('attemptsView'),c.failure?.attempts||[]);renderStructured($('repairView'),c.failure?.repair_log||[]);}
+  else if(c.failure){$('reportView').textContent=failureText(c.failure);renderStructured($('validationView'),c.failure?.validated?.issues||c.failure);renderStructured($('canonicalView'),c.failure?.canonical_case);renderStructured($('jsonView'),c.failure);renderStructured($('attemptsView'),c.failure?.attempts||[]);renderStructured($('repairView'),c.failure?.repair_log||[]);}
   else {
     $('reportView').textContent=`${c.case_id} is ${c.execution_status||'RUNNING'}. Final report is not available until testcase completion.`;
     for(const id of ['validationView','canonicalView','jsonView','attemptsView','repairView'])renderStructured($(id),null,{empty:'Live testcase data is available in Pipeline, Logs and Stats until the result is finalized.'});
