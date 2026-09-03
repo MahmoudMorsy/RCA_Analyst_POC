@@ -1,4 +1,4 @@
-# Home AI Server Deployment — v1.8.11
+# Home AI Server Deployment — v1.8.12
 
 The home server uses the **same** v1.8.11 application/container as Dell and RunPod. No hardware-specific code fork is allowed.
 
@@ -31,3 +31,7 @@ As on RunPod, v1.8.11 does not own external model-server lifecycle. Set real con
 ## v1.8.9 browser reconnect
 
 The Web client automatically rediscovers non-terminal runs from the server after authentication. Backend process restart semantics are unchanged.
+
+
+### v1.8.12 model-server check
+Use **Discover at Endpoint** after starting or changing an external model server. An empty loaded-model catalog is now an explicit error state. Use **Test Model** to run a minimal inference probe before starting a long RCA suite; the discovered runtime context is shown when the provider exposes it.

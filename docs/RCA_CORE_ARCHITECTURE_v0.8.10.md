@@ -1,7 +1,7 @@
 # RCA Analyst POC RCA Core v0.8.10 Architecture
 
 **Status:** candidate; not frozen  
-**Carried by:** RCA Analyst application v1.8.11
+**Carried by:** RCA Analyst application v1.8.12
 
 ## 1. Governing authority
 
@@ -216,7 +216,7 @@ RCA Core v0.8.10 is a **candidate**. Automated regressions are necessary but ins
 
 Live acceptance sequence:
 
-1. Deploy the exact v1.8.11 package and rerun the complete regression bundle with the same stable 27B critical-semantic routing used for the v1.8.10 validation run.
+1. Deploy the exact v1.8.12 package and rerun the complete regression bundle with the same stable 27B critical-semantic routing used for the v1.8.10 validation run.
 2. TC17 must produce REQ-1701 APPLICABLE/VIOLATED, REQ-1702 NOT APPLICABLE, REQ-1703 NOT APPLICABLE, with no unsupported hypotheses.
 3. TC12 must meet its documented ten-requirement target, including deterministic REQ-1204 1100 ms vs 800 ms (+300 ms).
 4. Routine schema/provenance defects should no longer force arbitration in every case.
@@ -297,4 +297,4 @@ These changes preserve all frozen evidence invariants, Python final compliance a
 - TC17: live-confirmed target.
 - Failures addressed by v0.8.10: TEST-007, TEST-015, TEST-016, TEST-018, TEST-019, TEST-021.
 
-The next freeze decision depends on the exact v1.8.11 full-suite RunPod result, not automated tests alone.
+The next freeze decision depends on the exact v1.8.12 full-suite RunPod result, not automated tests alone.

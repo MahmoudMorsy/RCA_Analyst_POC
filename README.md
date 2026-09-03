@@ -1,11 +1,11 @@
-# RCA Analyst v1.8.11 — Web UI + Hardware-Independent RCA Backend
+# RCA Analyst v1.8.12 — Web UI + Hardware-Independent RCA Backend
 
-**Application version:** v1.8.11  
+**Application version:** v1.8.12  
 **Embedded RCA Core:** v0.8.10 candidate
 
-v1.8.11 is the narrow live-full-suite contract patch built directly from the exact v1.8.10 RunPod regression. That 27B run completed all 17 cases, passed 11/17 semantic acceptance checks, and live-confirmed TC12 and TC17. The remaining six failures were traced to verifier-structure, requirement persistence scope, arbitration equivalence/provenance, and RCA packet completeness contracts rather than a topology failure.
+v1.8.12 is an application-only Models & Inference reliability patch on top of the v1.8.11 semantic package. It makes endpoint discovery fail visibly when no model is loaded, resolves compatible catalog/model-ID variants, discovers llama.cpp runtime context through provider metadata such as `/props`, and turns the model Test buttons into real lightweight inference probes. RCA Core remains v0.8.10 candidate.
 
-RCA Core v0.8.10 is **not frozen** until this exact v1.8.11 package passes the full live RunPod suite. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint. TC12 and TC17 are now live-confirmed 27B anchors.
+RCA Core v0.8.10 is **not frozen** until this exact v1.8.12 package passes the full live RunPod suite. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint. TC12 and TC17 are now live-confirmed 27B anchors.
 
 ## Architecture at a glance
 
@@ -34,6 +34,17 @@ RCA Backend API /api/v1
 ```
 
 The browser contains **zero RCA decision logic**. Model capacity may change by role, but Python remains authoritative for deterministic applicability/compliance/timing/evidence mechanics.
+
+## v1.8.12 highlights
+
+- Model discovery distinguishes reachable/no-model/unavailable states.
+- Single advertised models are resolved into the form after endpoint changes.
+- OpenAI-compatible `data[].id` and `models[].name` catalog variants are normalized.
+- llama.cpp runtime context is discovered from `/props` when catalog metadata omits it.
+- Model Test performs a real one-token inference request and leaves persistent PASS/FAIL feedback.
+- RCA Core v0.8.10 is unchanged.
+
+See [`docs/V1.8.12_RELEASE_NOTES.md`](docs/V1.8.12_RELEASE_NOTES.md).
 
 ## v1.8.11 highlights
 
@@ -177,6 +188,7 @@ Do not remove it until Web parity is live-proven.
 - [`docs/DEPLOY_LOCAL_DELL.md`](docs/DEPLOY_LOCAL_DELL.md)
 - [`docs/DEPLOY_RUNPOD.md`](docs/DEPLOY_RUNPOD.md)
 - [`docs/DEPLOY_HOME_AI_SERVER.md`](docs/DEPLOY_HOME_AI_SERVER.md)
+- [`docs/V1.8.12_RELEASE_NOTES.md`](docs/V1.8.12_RELEASE_NOTES.md)
 - [`docs/V1.8.11_RELEASE_NOTES.md`](docs/V1.8.11_RELEASE_NOTES.md)
 - [`VERSION_HISTORY.md`](VERSION_HISTORY.md)
 - [`CHANGELOG.md`](CHANGELOG.md)
@@ -189,6 +201,6 @@ Historical v0.8.4/v1.8.4/v1.8.5 architecture and release documents remain packag
 pytest -q
 ```
 
-v1.8.11 release validation: **241 passed** in the working tree and **241 passed** from a clean fresh extraction of the exact final ZIP.
+v1.8.12 release validation: **248 passed** in the working tree and **248 passed** from a clean fresh extraction of the exact release ZIP, plus Python compile, Web JavaScript syntax, FastAPI health/config/capabilities smoke and ZIP hygiene/integrity gates.
 
 Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun the complete live regression bundle with a stable model configuration. TC17 and TC12 remain explicit semantic anchors within that run. Do not consider RCA Core v0.8.10 frozen until live full-suite acceptance succeeds.

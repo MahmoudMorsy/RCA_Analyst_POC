@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.11  
+**Current application release:** v1.8.12  
 **Current RCA semantic-core baseline:** v0.8.10 candidate  
-**Validation status:** v1.8.10 completed the full 17-case 27B RunPod suite: 17/17 executions completed, 11/17 semantic acceptance passed, and TC12/TC17 hit their expected targets. v1.8.11 fixes the six remaining contract failures and remains candidate until its exact package passes the full live suite.
+**Validation status:** v1.8.10 completed the full 17-case 27B RunPod suite: 17/17 executions completed, 11/17 semantic acceptance passed, and TC12/TC17 hit their expected targets. v1.8.11 fixed the six remaining semantic/integration contracts. v1.8.12 is an application-only Models & Inference reliability patch required before the next exact-package full live suite; RCA Core remains v0.8.10 candidate.
 
 ## 1. Product vision
 
@@ -171,7 +171,7 @@ Same Web UI
 → Dell / RunPod / Home
 ```
 
-v1.8.11 retains all v1.8.10 Web/model/reconnect/failure-containment improvements and adds live-suite semantic contract hardening:
+v1.8.12 retains all v1.8.11 Web/model/reconnect/failure-containment and semantic-contract improvements and adds live-suite semantic contract hardening:
 
 - case enters the Tests list as `RUNNING` before pipeline execution;
 - the same lifecycle row updates to PASS/FAILED/CANCELLED;
@@ -257,3 +257,8 @@ The exact v1.8.10 27B suite proved the application-level batch continuation fix 
 - arbitration contract rejection reason is preserved in attempt diagnostics.
 
 The next live full-suite focus is TEST-007/015/016/018/019/021 while TC12 and TC17 remain non-regression anchors.
+
+
+## v1.8.12 acceptance delta
+
+Before a long RCA run, Models & Inference must provide reliable endpoint readiness checks: a reachable endpoint with no loaded model must fail discovery visibly; changing endpoint must not retain stale model/context state; a single advertised model should resolve automatically; runtime context should be reported when explicitly exposed by the provider; and Test Model must execute a minimal real inference request rather than only listing models. These are application/runtime contracts and do not alter RCA Core authority.

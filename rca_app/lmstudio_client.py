@@ -280,14 +280,103 @@ class LMStudioClient:
             headers["Authorization"] = f"Bearer {self.api_token}"
         return headers
 
+    @staticmethod
+    def _extract_context_size(payload: Any) -> Optional[int]:
+        """Extract provider-advertised/runtime context without guessing from model prose.
+
+        OpenAI-compatible servers are not consistent about where they expose their
+        runtime context. llama.cpp commonly exposes ``default_generation_settings.n_ctx``
+        through ``/props`` while LM Studio/provider catalogs may expose one of the
+        explicit context metadata keys below. Only explicit numeric metadata is used.
+        """
+        preferred_keys = (
+            "n_ctx",
+            "context_length",
+            "context_size",
+            "max_context_length",
+            "runtime_context_size",
+        )
+
+        def positive_int(value: Any) -> Optional[int]:
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                return None
+            return number if number > 0 else None
+
+        if isinstance(payload, dict):
+            # Prefer the explicit llama.cpp runtime setting over training/model maxima.
+            settings = payload.get("default_generation_settings")
+            if isinstance(settings, dict):
+                value = positive_int(settings.get("n_ctx"))
+                if value is not None:
+                    return value
+            for key in preferred_keys:
+                value = positive_int(payload.get(key))
+                if value is not None:
+                    return value
+            for key in ("meta", "details", "config", "loaded_instances", "data", "models"):
+                if key in payload:
+                    value = LMStudioClient._extract_context_size(payload[key])
+                    if value is not None:
+                        return value
+        elif isinstance(payload, list):
+            for item in payload:
+                value = LMStudioClient._extract_context_size(item)
+                if value is not None:
+                    return value
+        return None
+
+    def _runtime_context_size(self) -> Optional[int]:
+        base = self.base_url.rstrip("/")
+        root = base[:-3] if base.endswith("/v1") else base
+        # Provider-specific metadata probes are observational only. Failure of an
+        # optional probe never makes model discovery fail when /models itself works.
+        for url in (f"{root}/props", f"{root}/api/v0/models"):
+            try:
+                response = requests.get(url, headers=self.headers, timeout=5)
+                if not response.ok:
+                    continue
+                value = self._extract_context_size(response.json())
+                if value is not None:
+                    return value
+            except Exception:
+                continue
+        return None
+
     def model_catalog(self) -> list[dict[str, Any]]:
-        """Return provider-advertised model metadata without interpreting it."""
+        """Return a normalized provider-advertised model catalog.
+
+        OpenAI-compatible implementations differ slightly: standard endpoints use
+        ``data`` while some llama.cpp-compatible surfaces also/only expose ``models``
+        with ``name`` rather than ``id``. Normalize only those structural aliases.
+        """
         url = f"{self.base_url}/models"
         try:
             r = requests.get(url, headers=self.headers, timeout=15)
             r.raise_for_status()
             data = r.json()
-            return [dict(item) for item in data.get("data", []) if isinstance(item, dict)]
+            raw_items = data.get("data") if isinstance(data, dict) else None
+            if not isinstance(raw_items, list) or not raw_items:
+                raw_items = data.get("models", []) if isinstance(data, dict) else []
+            catalog: list[dict[str, Any]] = []
+            for raw in raw_items:
+                if not isinstance(raw, dict):
+                    continue
+                item = dict(raw)
+                if not item.get("id"):
+                    item["id"] = item.get("name") or item.get("model") or ""
+                if item.get("id"):
+                    catalog.append(item)
+
+            context_size = self._extract_context_size(catalog) or self._runtime_context_size()
+            if context_size is not None and catalog:
+                meta = catalog[0].get("meta")
+                meta = dict(meta) if isinstance(meta, dict) else {}
+                meta.setdefault("runtime_context_size", context_size)
+                meta.setdefault("n_ctx", context_size)
+                catalog[0]["meta"] = meta
+            return catalog
         except Exception as exc:
             raise LMStudioError(f"Could not query model catalog at {url}: {exc}") from exc
 
@@ -295,10 +384,48 @@ class LMStudioClient:
         return [str(item["id"]) for item in self.model_catalog() if item.get("id")]
 
     def test_connection(self) -> tuple[bool, str]:
-        models = self.list_models()
+        catalog = self.model_catalog()
+        models = [str(item["id"]) for item in catalog if item.get("id")]
         if not models:
-            return True, "LM Studio server is reachable, but no models were returned."
-        return True, f"LM Studio server reachable. {len(models)} model(s) available."
+            return False, "Endpoint is reachable, but no loaded model is advertised."
+        if self.model and self.model not in models:
+            return False, f"Configured model is not advertised by this endpoint. Available: {', '.join(models)}"
+        resolved_model = self.model or (models[0] if len(models) == 1 else "")
+        if not resolved_model:
+            return False, f"Endpoint advertises {len(models)} models; select one before testing inference."
+
+        transport = self.resolve_transport()
+        if transport == "qwen35-manual":
+            url = f"{self.base_url}/completions"
+            payload = {
+                "model": resolved_model,
+                "prompt": "Reply with OK.",
+                "temperature": 0,
+                "max_tokens": 1,
+                "stream": False,
+            }
+        else:
+            url = f"{self.base_url}/chat/completions"
+            payload = {
+                "model": resolved_model,
+                "messages": [{"role": "user", "content": "Reply with OK."}],
+                "temperature": 0,
+                "max_tokens": 1,
+                "stream": False,
+            }
+            if self.thinking_mode == "off":
+                payload["chat_template_kwargs"] = {"enable_thinking": False}
+        try:
+            response = requests.post(url, headers=self.headers, json=payload, timeout=15)
+            response.raise_for_status()
+            body = response.json()
+            if not isinstance(body, dict) or not isinstance(body.get("choices"), list):
+                return False, "Inference endpoint responded, but not with an OpenAI-compatible completion payload."
+            context_size = self._extract_context_size(catalog)
+            suffix = f" Context: {context_size}." if context_size else ""
+            return True, f"Model inference test passed for {resolved_model} via {transport}.{suffix}"
+        except Exception as exc:
+            return False, f"Model is advertised but inference test failed at {url}: {exc}"
 
     def resolve_transport(self) -> str:
         if self.transport != "auto":

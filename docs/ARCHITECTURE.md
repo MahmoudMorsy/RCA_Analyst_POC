@@ -1,13 +1,13 @@
-# RCA Analyst v1.8.11 Application Architecture
+# RCA Analyst v1.8.12 Application Architecture
 
 ## 1. Scope and semantic baseline
 
-**Application version:** v1.8.11  
+**Application version:** v1.8.12  
 **Embedded RCA Core:** v0.8.10 candidate
 
-v1.8.11 keeps the v1.8.x Web/FastAPI modular-monolith architecture and all v1.8.10 failure-containment/reconnect/live-view behavior. It carries RCA Core v0.8.10, a narrow contract-hardening release driven by the complete v1.8.10 27B RunPod suite.
+v1.8.12 keeps the v1.8.x Web/FastAPI modular-monolith architecture and RCA Core v0.8.10 unchanged. It is an application-only reliability patch for model endpoint discovery, context metadata and active inference testing.
 
-RCA Core v0.8.10 is **not frozen** until the exact v1.8.11 package passes a stable live full-suite rerun. TC12 and TC17 are live-confirmed 27B anchors from v1.8.10; TC21 remains the primary RCA integration anchor. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.10 is **not frozen** until the exact v1.8.12 package passes a stable live full-suite rerun. TC12 and TC17 are live-confirmed 27B anchors from v1.8.10; TC21 remains the primary RCA integration anchor. Frozen semantic anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 Current core details are documented in [`RCA_CORE_ARCHITECTURE_v0.8.10.md`](RCA_CORE_ARCHITECTURE_v0.8.10.md). Historical v0.8.4-v0.8.8 architecture documents remain packaged separately.
 
@@ -306,3 +306,8 @@ Independent verifier equality uses executable behavior semantics and normalized 
 ## v1.8.11 live-suite contract hardening
 
 The application topology is unchanged. v1.8.11 carries Core v0.8.10 and preserves v1.8.10 testcase isolation/session forensics. New core-facing observability persists arbitration contract-rejection reasons with the raw model attempt. The full v1.8.10 RunPod session completed 17/17 cases with 11/17 semantic PASS, proving batch continuation and TC12/TC17 behavior before this patch.
+
+
+## v1.8.12 Models & Inference endpoint contract
+
+The backend distinguishes endpoint reachability from model readiness. `/models/discover` reports `AVAILABLE`, `NO_MODELS`, or `UNAVAILABLE`; compatible provider catalog aliases are normalized structurally; optional provider metadata probes enrich runtime context without controlling the external server. The Web UI invalidates endpoint-specific model/context data when an endpoint is edited and displays persistent discovery/test status. Model Test performs a minimal actual inference request. No RCA semantic logic moved into the browser or backend model-discovery layer.

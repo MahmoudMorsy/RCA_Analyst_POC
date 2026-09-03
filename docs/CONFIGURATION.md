@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.11 Configuration Reference
+# RCA Analyst v1.8.12 Configuration Reference
 
 ## Top-level application configuration
 
@@ -24,7 +24,7 @@ Each role contains:
 - `transport`
 - `api_token_env`
 
-`context_size` is expected/provider metadata in v1.8.11; it does not reconfigure an already-running external model server.
+`context_size` is expected/provider metadata in v1.8.12; discovery may populate it from explicit provider runtime metadata (for example llama.cpp `/props`). It does not reconfigure an already-running external model server.
 
 ### `model_routing` — new in v1.8.7
 
@@ -110,3 +110,8 @@ Only (2) controls the running server's real context window. v1.8.11 model discov
 ## v1.8.9 Web state
 
 Active-run rediscovery is backend-driven and requires no new RCA semantic configuration. Browser local state stores only UI preferences/selection hints. Critical semantic routing remains explicit and should be verified from the run/session model-call telemetry.
+
+
+### Model discovery versus model loading
+
+Discovery is observational. A reachable endpoint with no advertised models is reported as `NO_MODELS`; RCA Analyst does not load the model on behalf of LM Studio/llama.cpp/vLLM. Editing an endpoint invalidates the previous endpoint-specific model/context selection in the Web form until discovery is run again.

@@ -1,4 +1,4 @@
-# Local Dell Deployment — v1.8.11
+# Local Dell Deployment — v1.8.12
 
 ## Goal
 
@@ -19,7 +19,7 @@ The default backend binds only to `127.0.0.1` and does not require an API token.
 
 ## Python compatibility
 
-The supported Dell runtime remains Python 3.9+. v1.8.11 retains the server-layer compatibility fix introduced in v1.8.5.
+The supported Dell runtime remains Python 3.9+. v1.8.12 retains the server-layer compatibility fix introduced in v1.8.5.
 
 ## Context and model-server settings
 
@@ -39,3 +39,7 @@ For cross-hardware comparison, keep RCA stage settings and semantic routing equi
 ## v1.8.9 browser reconnect
 
 A page reload/tab restart can reattach to a still-running local backend run. A backend process restart cannot resume an in-flight worker.
+
+
+### v1.8.12 model-server check
+Use **Discover at Endpoint** after starting or changing an external model server. An empty loaded-model catalog is now an explicit error state. Use **Test Model** to run a minimal inference probe before starting a long RCA suite; the discovered runtime context is shown when the provider exposes it.

@@ -1,6 +1,18 @@
 # RCA Analyst Version History
 
-## Current release — v1.8.11 / RCA Core v0.8.10 candidate
+## Current release — v1.8.12 / RCA Core v0.8.10 candidate
+
+- v1.8.12 is application-only; RCA semantic topology and compliance authority are unchanged.
+- Models & Inference discovery now rejects reachable endpoints with no loaded model, normalizes compatible catalog variants, resolves a single model after endpoint changes, and reports runtime context from explicit provider metadata such as llama.cpp `/props`.
+- Model Test now validates the advertised selection and executes a minimal inference request with persistent Web feedback.
+- The next live semantic gate remains the exact-package 17-case RunPod suite; TC12/TC17 remain live-confirmed controls from v1.8.10.
+- Release validation: **248 passed** in the working tree and **248 passed** from the exact freshly extracted v1.8.12 ZIP; Core v0.8.10 remains candidate pending live full-suite validation.
+
+## v1.8.11 → v1.8.12
+
+See `docs/V1.8.12_RELEASE_NOTES.md`. RCA Core remains v0.8.10.
+
+## Previous current release — v1.8.11 / RCA Core v0.8.10 candidate
 
 - The exact v1.8.10 27B RunPod suite completed all 17 cases; 11/17 passed semantic acceptance. TC12 and TC17 passed their live targets.
 - v1.8.11 rejects structurally incomplete VERIFIED verifier fingerprints instead of converting missing verifier fields into false compiler disagreements.
@@ -22,7 +34,7 @@ See `docs/V1.8.9_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`.
 
 ## Current version model
 
-- **Application version:** v1.8.11 — live-full-suite semantic-contract hardening on the v1.8.10 failure-containment application baseline.
+- **Application version:** v1.8.12 — Models & Inference reliability patch on the v1.8.11 semantic-contract baseline.
 - **Embedded RCA Core:** v0.8.10 candidate — verifier-completeness, canonical persistence scope, arbitration equivalence/provenance and RCA packet closure on v0.8.9.
 - **Validation:** v1.8.10 completed 17/17 live executions with 11/17 semantic PASS and clean TC12/TC17 anchors. Automated v1.8.11 release gates must pass, then the exact package must rerun the full suite before v0.8.10 can freeze.
 - Frozen regression anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.

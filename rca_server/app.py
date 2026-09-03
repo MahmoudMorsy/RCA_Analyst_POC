@@ -161,19 +161,53 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
                 out[role] = {"status": "UNAVAILABLE", "configured": item.model, "models": [], "error": str(exc)}
         return out
 
+    def _catalog_context_size(catalog):
+        for entry in catalog or []:
+            if not isinstance(entry, dict):
+                continue
+            meta = entry.get("meta") if isinstance(entry.get("meta"), dict) else {}
+            details = entry.get("details") if isinstance(entry.get("details"), dict) else {}
+            for source in (entry, meta, details):
+                for key in ("runtime_context_size", "n_ctx", "context_length", "context_size", "max_context_length"):
+                    value = source.get(key)
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if value > 0:
+                        return value
+        return None
+
     @app.post("/api/v1/models/discover", dependencies=[Depends(auth)])
     async def discover_model(request: ModelDiscoverRequest):
         cfg = config_store.load()
         try:
             spec = _model_spec(request.role, cfg, request.config)
             catalog = gateway.model_catalog(spec)
+            models = [str(x.get("id")) for x in catalog if x.get("id")]
+            context_size = _catalog_context_size(catalog)
+            resolved_model = request.config.model if request.config.model in models else (models[0] if len(models) == 1 else "")
+            if not models:
+                return {
+                    "role": request.role,
+                    "status": "NO_MODELS",
+                    "endpoint": request.config.endpoint,
+                    "configured": request.config.model,
+                    "resolved_model": "",
+                    "models": [],
+                    "catalog": catalog,
+                    "context_size": context_size,
+                    "error": "Endpoint is reachable, but it advertises no loaded models.",
+                }
             return {
                 "role": request.role,
                 "status": "AVAILABLE",
                 "endpoint": request.config.endpoint,
                 "configured": request.config.model,
-                "models": [str(x.get("id")) for x in catalog if x.get("id")],
+                "resolved_model": resolved_model,
+                "models": models,
                 "catalog": catalog,
+                "context_size": context_size,
             }
         except Exception as exc:
             return {
@@ -181,8 +215,10 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
                 "status": "UNAVAILABLE",
                 "endpoint": request.config.endpoint,
                 "configured": request.config.model,
+                "resolved_model": "",
                 "models": [],
                 "catalog": [],
+                "context_size": None,
                 "error": str(exc),
             }
 
@@ -194,9 +230,31 @@ def create_app(*, settings: Optional[BackendSettings] = None, run_manager: Optio
             spec = _model_spec(request.role, cfg, item)
             ok, message = gateway.test_connection(spec)
             catalog = gateway.model_catalog(spec)
-            return {"role": request.role, "ok": ok, "message": message, "endpoint": item.endpoint, "model": item.model, "catalog": catalog}
+            models = [str(x.get("id")) for x in catalog if x.get("id")]
+            resolved_model = item.model if item.model in models else (models[0] if len(models) == 1 else "")
+            return {
+                "role": request.role,
+                "ok": ok,
+                "message": message,
+                "endpoint": item.endpoint,
+                "model": item.model,
+                "resolved_model": resolved_model,
+                "models": models,
+                "context_size": _catalog_context_size(catalog),
+                "catalog": catalog,
+            }
         except Exception as exc:
-            return {"role": request.role, "ok": False, "message": str(exc), "endpoint": item.endpoint, "model": item.model, "catalog": []}
+            return {
+                "role": request.role,
+                "ok": False,
+                "message": str(exc),
+                "endpoint": item.endpoint,
+                "model": item.model,
+                "resolved_model": "",
+                "models": [],
+                "context_size": None,
+                "catalog": [],
+            }
 
     @app.get("/api/v1/config", dependencies=[Depends(auth)])
     async def get_config():

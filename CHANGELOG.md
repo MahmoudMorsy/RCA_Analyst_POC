@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.12
+
+- Application-only Models & Inference reliability patch; RCA Core remains **v0.8.10 candidate**.
+- Treat reachable endpoints with an empty model catalog as `NO_MODELS` rather than successful discovery.
+- Normalize standard `data[].id` and compatible `models[].name`/`models[].model` model catalogs and resolve a single advertised model automatically.
+- Discover explicit runtime context metadata, including llama.cpp `/props` `default_generation_settings.n_ctx` when `/v1/models` omits runtime context.
+- Invalidate stale model/context fields when the endpoint is edited.
+- Make Model Test perform a real minimal `/chat/completions` inference probe and show persistent PASS/FAIL feedback.
+- Add v1.8.12 model discovery/context/inference regression coverage.
+
 ## 1.8.11
 
 - Promote application to **v1.8.11** with embedded **RCA Core v0.8.10 candidate** after the exact v1.8.10 27B RunPod suite completed 17/17 executions and achieved 11/17 semantic acceptance.

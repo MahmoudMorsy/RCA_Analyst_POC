@@ -1,6 +1,6 @@
 # RCA Analyst — Application Architecture Versions
 
-**Current application version:** v1.8.11  
+**Current application version:** v1.8.12  
 **Embedded RCA Core:** v0.8.10 candidate
 
 ## 1. Principles
@@ -104,13 +104,13 @@ Key endpoints include:
 
 ## 11. Deployment
 
-The exact same v1.8.11 application package runs on Dell, RunPod and Home. Model endpoints/model IDs/context/offload are deployment configuration. External llama.cpp/LM Studio/vLLM process lifecycle remains external unless a future adapter explicitly owns it.
+The exact same v1.8.12 application package runs on Dell, RunPod and Home. Model endpoints/model IDs/context/offload are deployment configuration. External llama.cpp/LM Studio/vLLM process lifecycle remains external unless a future adapter explicitly owns it.
 
 ## 12. Current validation status
 
 Automated application/core tests, compile/static checks, JS syntax, API smoke and clean-package replay are mandatory release gates. They do not replace live model/browser acceptance.
 
-Next: deploy the exact v1.8.11 package and rerun the complete live regression bundle with the same stable 27B settings. RCA Core v0.8.10 remains candidate.
+Next: deploy the exact v1.8.12 package and rerun the complete live regression bundle with the same stable 27B settings. RCA Core v0.8.10 remains candidate.
 
 
 ## B8 — v1.8.9 reconnect and live pipeline UX
@@ -130,3 +130,8 @@ This application behavior is independent from semantic acceptance and does not c
 ## B10 — v1.8.11 live-suite semantic contract patch
 
 Application topology and Web behavior remain unchanged from v1.8.10. The package carries RCA Core v0.8.10 and adds only richer arbitration-attempt diagnostics at the application/session boundary. The v1.8.10 full run proved 17/17 batch completion; v1.8.11 must preserve that behavior while the six remaining semantic/integration cases are revalidated.
+
+
+## B11 — v1.8.12 Models & Inference reliability patch
+
+v1.8.12 is application-only; RCA Core remains v0.8.10. Model discovery now treats an empty loaded-model catalog as an explicit failure state, normalizes compatible OpenAI catalog aliases, resolves a single advertised model into the current form, and enriches runtime context from explicit provider metadata such as llama.cpp `/props`. Endpoint edits invalidate stale model/context data. Model Test now performs a minimal actual inference request and leaves persistent PASS/FAIL feedback in the Web panel. External model-server lifecycle remains outside RCA Analyst.

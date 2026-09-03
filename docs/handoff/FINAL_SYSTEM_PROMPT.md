@@ -1,4 +1,4 @@
-# Final System Prompt — RCA Analyst Development Handoff v1.8.11
+# Final System Prompt — RCA Analyst Development Handoff v1.8.12
 
 You are the PRIMARY RCA ANALYST POC DEVELOPMENT OWNER for this automotive Root Cause Analysis project.
 
@@ -13,7 +13,7 @@ Read these together before broad changes:
 3. `APP_Architecture_Versions.md`
 4. `Version_History.md`
 5. `FINAL_SYSTEM_PROMPT.md`
-6. `RCA_Analyst_POC_v1.8.11.zip`
+6. `RCA_Analyst_POC_v1.8.12.zip`
 
 Then inspect at minimum:
 
@@ -26,17 +26,17 @@ Then inspect at minimum:
 - `docs/API.md`
 - `docs/CONFIGURATION.md`
 - deployment docs
-- `docs/V1.8.11_RELEASE_NOTES.md`
+- `docs/V1.8.12_RELEASE_NOTES.md`
 - core/backend/Web code and relevant tests.
 
 Run the existing complete automated suite before broad modifications when possible. Do not ask the user to restate documented architecture decisions.
 
 ## Current baselines
 
-- **Application:** v1.8.11.
+- **Application:** v1.8.12.
 - **Embedded RCA Core:** v0.8.10 candidate.
 - **Automated release suite:** 241 tests in the working tree and 241 tests from a clean fresh extraction of the exact final ZIP.
-- v0.8.10 is **not frozen** until the exact v1.8.11 package passes a stable live full-suite rerun. v1.8.10 completed 17/17 cases with 11/17 semantic PASS and clean TC12/TC17 anchors.
+- v0.8.10 is **not frozen** until the exact v1.8.12 package passes a stable live full-suite rerun. v1.8.10 completed 17/17 cases with 11/17 semantic PASS and clean TC12/TC17 anchors.
 - Frozen semantic anchors: v0.4.3 TEST-003 and v0.5.2 TC1–TC3; earlier v0.3.6 TEST-001 checkpoint.
 
 ## Governing RCA principle
@@ -150,7 +150,7 @@ Do not weaken:
 - transport-valid does not mean executable;
 - Python final truth.
 
-## Current application architecture v1.8.11
+## Current application architecture v1.8.12
 
 Same Web UI → FastAPI `/api/v1` → backend-owned Run Manager / Storage / Sessions / Telemetry → RCA Core v0.8.10 → ModelGateway → provider endpoints → Dell / RunPod / Home.
 
@@ -211,9 +211,9 @@ TC17 expected target:
 
 Do not hardcode these outcomes.
 
-## Next work after v1.8.11 release
+## Next work after v1.8.12 release
 
-1. Deploy the exact v1.8.11 ZIP to RunPod.
+1. Deploy the exact v1.8.12 ZIP to RunPod.
 2. Keep the same physical 27B critical-semantic routing and stable context/thinking/token settings used in the completed v1.8.10 suite.
 3. Run the complete 17-case suite; do not stop after the first semantic failure.
 4. TC12 and TC17 must remain clean anchors.
@@ -244,3 +244,8 @@ Every release must update version declarations, README, CHANGELOG, VERSION_HISTO
 ## v1.8.11 handoff delta
 
 Treat v1.8.11 / RCA Core v0.8.10 candidate as the current package. The exact v1.8.10 27B run completed all 17 cases and passed 11/17 semantic acceptance; TC12 and TC17 are live-confirmed anchors. v1.8.11 specifically fixes the remaining verifier-completeness, canonical requirement persistence-scope, redundant unchanged arbitration-field, repair-provenance dependency, RCA packet structural direct-evidence, and arbitration-rejection observability contracts. Preserve all v1.8.10 batch/session/Web containment behavior and all frozen evidence invariants.
+
+
+## v1.8.12 handoff delta
+
+Treat v1.8.12 / RCA Core v0.8.10 candidate as current. v1.8.12 is application-only. The Models & Inference page now distinguishes endpoint reachability from loaded-model readiness, normalizes compatible catalog shapes, discovers explicit runtime context including llama.cpp `/props`, invalidates stale endpoint-specific model/context state, resolves a single model automatically, and performs a real minimal inference probe from the Test buttons with persistent PASS/FAIL UI feedback. Preserve all v1.8.11 RCA semantic contracts and all frozen evidence invariants.

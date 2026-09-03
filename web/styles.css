@@ -15,3 +15,4 @@
 .structured-card{border:1px solid var(--border);border-radius:7px;background:var(--panel2);overflow:hidden}.structured-card>summary{padding:7px 9px;color:var(--accent2);font-weight:800}.structured-card>.structured-object,.structured-card>.structured-array{padding:0 8px 8px}
 .structured-view .raw-json{margin:12px 0 0}.structured-view .raw-json pre{padding:8px;background:var(--input);border:1px solid var(--border);border-radius:6px}
 @media(max-width:800px){.kv-grid{grid-template-columns:1fr}.kv-row{grid-template-columns:1fr}.kv-key{padding-bottom:2px}}
+.model-status{margin:8px 0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel2);font-size:12px}.model-status.good{border-color:var(--good);color:var(--good)}.model-status.bad{border-color:var(--bad);color:var(--bad)}.model-status.neutral{color:var(--muted)}

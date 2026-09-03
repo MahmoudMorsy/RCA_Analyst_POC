@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.11 API
+# RCA Analyst v1.8.12 API
 
 Base path: `/api/v1`.
 
@@ -147,3 +147,10 @@ Generic testcase failure payloads include:
 A completed bundle may therefore contain a mix of `PASS` and `FAILED` testcase rows while the run itself is `COMPLETED`. `COMPLETED` means the requested sequence finished; it does not mean semantic acceptance passed.
 
 If a run has both partial result data and an unrecoverable run-level failure, the saved session keeps the normal result payload and adds `run_failure`.
+
+
+## v1.8.12 model endpoint discovery/test behavior
+
+`POST /api/v1/models/discover` uses the request's current form configuration and returns `status` as `AVAILABLE`, `NO_MODELS`, or `UNAVAILABLE`, plus `models`, `resolved_model`, `catalog`, and discovered `context_size` when explicit provider metadata exposes it. `NO_MODELS` means the HTTP endpoint is reachable but no model is currently advertised/loaded.
+
+`POST /api/v1/models/test` validates the selected model against the current endpoint and performs a minimal OpenAI-compatible chat completion probe. The response includes `ok`, `message`, `resolved_model`, `models`, `catalog`, and `context_size`. This endpoint tests inference readiness; it does not start or load a model server.

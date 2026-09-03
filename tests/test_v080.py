@@ -812,7 +812,7 @@ def test_v084_release_docs_are_packaged_in_source_tree():
     assert (root / "CHANGELOG.md").exists()
     history = (root / "VERSION_HISTORY.md").read_text(encoding="utf-8")
     assert "## v0.8.3 → v0.8.4" in history
-    assert "Current release — v1.8.11" in history
+    assert "Current release — v1.8.12" in history
 
 
 def test_v085_verifier_structured_fingerprint_catches_live_tc17_boolean_regrouping_even_when_marked_verified():

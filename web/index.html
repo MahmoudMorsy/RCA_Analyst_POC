@@ -150,7 +150,7 @@
             <label>Transport<select id="primaryTransport"><option value="auto">Auto</option><option value="openai-chat">OpenAI chat</option><option value="qwen35-manual">Qwen3.5 manual</option></select></label>
             <label>Model API token env<input id="primaryTokenEnv" placeholder="LM_API_TOKEN"></label>
           </div>
-          <div id="primaryModelHint" class="model-hint subtle"></div><button id="testPrimaryBtn" class="secondary">Test Primary Model</button>
+          <div id="primaryModelHint" class="model-hint subtle"></div><div id="primaryModelStatus" class="model-status neutral" hidden></div><button id="testPrimaryBtn" class="secondary">Test Primary Model</button>
         </article>
         <article class="panel">
           <div class="panel-title"><h2>Small / Utility Model</h2><button id="discoverSmallBtn" class="secondary">Discover at Endpoint</button></div>
@@ -165,7 +165,7 @@
             <label>Expected server context <span class="subtle">(metadata/check only)</span><input id="smallContext" type="number" min="0"></label>
             <label>Model API token env<input id="smallTokenEnv" placeholder="LM_API_TOKEN"></label>
           </div>
-          <div id="smallModelHint" class="model-hint subtle"></div><button id="testSmallBtn" class="secondary">Test Small Model</button>
+          <div id="smallModelHint" class="model-hint subtle"></div><div id="smallModelStatus" class="model-status neutral" hidden></div><button id="testSmallBtn" class="secondary">Test Small Model</button>
         </article>
         <article class="panel span-two">
           <div class="panel-title"><div><h2>Inference Engine</h2><p>Hardware/provider dependent. In v1.8.11 these fields describe/validate external model-server settings; the RCA backend does not restart or reconfigure llama.cpp/LM Studio/vLLM processes.</p></div><span id="capabilityHint" class="subtle"></span></div>
