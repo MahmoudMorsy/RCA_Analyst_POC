@@ -1,6 +1,6 @@
 # RCA Architecture Versions
 
-**Current RCA architecture carried by application v1.8.8:** RCA Core v0.8.7 candidate.
+**Current RCA architecture carried by application v1.8.9:** RCA Core v0.8.8 candidate.
 
 ## 1. Persistent invariants
 
@@ -60,7 +60,7 @@ This solved the dominant reasoning/token explosion and made a complete live regr
 
 ## 10. A8 — v0.8.7 full-suite semantic-contract hardening
 
-The complete v1.8.7 RunPod suite exposed additional systemic failures. v0.8.7 adds:
+The complete v1.8.7 RunPod suite exposed additional systemic failures. v0.8.7 added:
 
 ### 10.1 Compiler batch completeness
 
@@ -122,6 +122,11 @@ Do not weaken state/transition/interval distinctions, point-vs-scope semantics, 
 
 ## 13. Validation status
 
-RCA Core v0.8.7 is a **candidate**, not frozen.
+RCA Core v0.8.8 is a **candidate**, not frozen.
 
-Deploy the exact v1.8.8 package and rerun the complete regression bundle with stable model settings. TC17 and TC12 remain explicit semantic anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
+Deploy the exact v1.8.9 package and rerun the complete regression bundle with stable model settings. TC17 and TC12 remain explicit semantic anchors. Freeze only after live full-suite acceptance and frozen-anchor regression confirmation.
+
+
+## A9 — v0.8.8 deterministic integration hardening
+
+Controlled 27B reruns isolated deterministic/integration failures after semantic interpretation became correct. v0.8.8 removes requirement-ID execution whitelisting on verified facts, enforces all-target completion, field-atomic arbitration, advisory free-text case ambiguity, canonical RCA source classification, unresolved requirement context and machine-ID hypothesis provenance.

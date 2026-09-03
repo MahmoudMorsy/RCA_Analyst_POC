@@ -1,4 +1,15 @@
-# RCA Analyst POC — Version History
+# RCA Analyst Version History
+
+## Current release — v1.8.9 / RCA Core v0.8.8 candidate
+
+- Controlled 27B reruns established TEST-006 and TEST-012 as clean controls and isolated remaining TEST-017/TEST-021 core integration defects.
+- v0.8.8 fixes deterministic fact reuse, all-target completion, atomic arbitration, RCA packet classification/provenance and unresolved requirement visibility.
+- v1.8.9 fixes active-run browser reconnect and live pipeline expansion/selection persistence.
+- Automated release suite: **225 tests** before packaging; live full-suite validation remains required before freezing v0.8.8.
+
+## v1.8.8 → v1.8.9
+
+See `docs/V1.8.9_RELEASE_NOTES.md` and `docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`.
 
 ## Current version model
 
@@ -151,7 +162,7 @@ This file is the chronological release-history log for the RCA Analyst POC. It c
 For v0.1, which predates the formal changelog, the entry is reconstructed from the repository README section **Why v0.2 exists**. All later entries come from the maintained changelog/release notes.
 
 **Earliest known release:** v0.1
-**Current release:** v1.8.8
+**Previous release:** v1.8.8
 
 ## v0.1 — Earliest known baseline
 

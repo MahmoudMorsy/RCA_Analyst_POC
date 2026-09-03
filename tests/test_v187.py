@@ -128,6 +128,7 @@ def test_v187_targeted_structural_patch_repairs_live_tc17_shells_without_overwri
                 semantic_id="REQ-1703.persistence", source_phrase="StarterEnable shall remain FALSE",
                 required=True, scope="WHILE_CONDITION",
             ),
+            source_clauses=prep.requirement_irs[2].source_clauses,
         ),
     ])
 

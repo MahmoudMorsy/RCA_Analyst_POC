@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.8 API
+# RCA Analyst v1.8.9 API
 
 Base path: `/api/v1`.
 
@@ -59,7 +59,7 @@ The response contains `models` and the provider `catalog` where available. llama
 }
 ```
 
-`config_override` is optional. v1.8.8 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
+`config_override` is optional. v1.8.9 Web runs submit the current form as an immutable per-run override so deployment environment variables remain backend defaults without silently blocking a one-run routing experiment.
 
 Run types:
 
@@ -74,7 +74,7 @@ Response returns quickly:
 ```
 
 
-### Testcase lifecycle — v1.8.8
+### Testcase lifecycle — v1.8.9
 
 `GET /api/v1/runs/{run_id}/result` now includes top-level `case_lifecycle`. For batch runs, `result.cases` also contains the current RUNNING testcase before completion. A lifecycle record includes the testcase ID, execution status, semantic acceptance state, timestamps, result availability and partial/final statistics where available.
 
@@ -120,3 +120,8 @@ Authorization: Bearer <RCA_API_TOKEN>
 ```
 
 Browser bearer tokens are session-scoped and are not committed in frontend source.
+
+
+## v1.8.9 reconnect behavior
+
+`GET /runs` is the browser reconnect source of truth. Non-terminal runs are rediscovered after authentication; run status/pipeline/logs/metrics/result endpoints are then reattached through the existing run ID.

@@ -1,7 +1,7 @@
 # RCA Analyst — Application Architecture Versions
 
-**Current application version:** v1.8.8  
-**Embedded RCA Core:** v0.8.7 candidate
+**Current application version:** v1.8.9  
+**Embedded RCA Core:** v0.8.8 candidate
 
 ## 1. Principles
 
@@ -104,10 +104,15 @@ Key endpoints include:
 
 ## 11. Deployment
 
-The exact same v1.8.8 application package runs on Dell, RunPod and Home. Model endpoints/model IDs/context/offload are deployment configuration. External llama.cpp/LM Studio/vLLM process lifecycle remains external unless a future adapter explicitly owns it.
+The exact same v1.8.9 application package runs on Dell, RunPod and Home. Model endpoints/model IDs/context/offload are deployment configuration. External llama.cpp/LM Studio/vLLM process lifecycle remains external unless a future adapter explicitly owns it.
 
 ## 12. Current validation status
 
 Automated application/core tests, compile/static checks, JS syntax, API smoke and clean-package replay are mandatory release gates. They do not replace live model/browser acceptance.
 
-Next: deploy the exact v1.8.8 package and rerun the complete live regression bundle with stable model settings. RCA Core v0.8.7 remains candidate.
+Next: deploy the exact v1.8.9 package and rerun the complete live regression bundle with stable model settings. RCA Core v0.8.8 remains candidate.
+
+
+## B8 — v1.8.9 reconnect and live pipeline UX
+
+The Web client reconciles active runs from the backend after authentication. One active run resumes automatically; multiple active runs are selectable. Pipeline structured-tree expansion and per-run testcase/stage selection survive live polling rerenders.

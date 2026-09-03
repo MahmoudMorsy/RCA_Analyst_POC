@@ -121,14 +121,13 @@ class DeterministicComplianceEngine:
             if issue.requirement_id:
                 material_req_issues.setdefault(issue.requirement_id, []).append(issue)
             elif issue.evidence_id:
-                # Evidence issue can affect only requirements explicitly linked by
-                # the semantic annotation; otherwise keep it globally conservative.
+                # Evidence ambiguity blocks only requirements explicitly linked
+                # through structured semantic metadata. It must not become a
+                # case-wide blocker merely because the same signal name appears
+                # elsewhere in Requirement IRs.
                 impacted = self._requirements_linked_to_evidence(preparation, issue.evidence_id, ir_by_id)
-                if impacted:
-                    for rid in impacted:
-                        material_req_issues.setdefault(rid, []).append(issue)
-                else:
-                    global_material.append(issue)
+                for rid in impacted:
+                    material_req_issues.setdefault(rid, []).append(issue)
             else:
                 global_material.append(issue)
 
@@ -566,7 +565,11 @@ class DeterministicComplianceEngine:
 
     @staticmethod
     def _fact_allowed_for_requirement(fact: FactRecord, rid: str) -> bool:
-        return not fact.related_requirement_ids or rid in fact.related_requirement_ids
+        # ``related_requirement_ids`` is semantic linkage/materiality metadata,
+        # not an execution whitelist. Once a fact is VERIFIED and executable,
+        # any Requirement IR may use it when the structured signal/operator/
+        # value/scope actually match.
+        return True
 
     def _compare_predicate(self, operator: PredicateOperator, expected: str, fact: FactRecord) -> Truth:
         if operator in {PredicateOperator.LT, PredicateOperator.LTE, PredicateOperator.GT, PredicateOperator.GTE}:
@@ -755,12 +758,6 @@ class DeterministicComplianceEngine:
                 continue
             for fact in ann.facts:
                 out.update(r for r in fact.related_requirement_ids if r in ir_by_id)
-                if fact.subject:
-                    for rid, ir in ir_by_id.items():
-                        signals: Set[str] = set()
-                        DeterministicComplianceEngine._collect_ir_signals(ir, signals)
-                        if fact.subject.lower() in signals:
-                            out.add(rid)
         return out
 
     @staticmethod

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8.9
+
+- Promote application to **v1.8.9** with embedded **RCA Core v0.8.8 candidate**.
+- Fix VERIFIED fact reuse across structurally matching requirements; `related_requirement_ids` is linkage metadata rather than an execution whitelist.
+- Require all targeted fields from structural completion patches.
+- Make semantic arbitration field-atomic and non-regressive, with backward-compatible target-only merging from legacy full IRs.
+- Make free-form case ambiguity advisory unless a structured material issue exists.
+- Route diagnostic/historical RCA packet facts by canonical source class.
+- Preserve materially unresolved requirements as explicit RCA context.
+- Separate strict hypothesis machine IDs from human-readable source-reference labels.
+- Rediscover active backend runs after Web reconnect and expose multiple active runs through a selector.
+- Preserve expanded pipeline Input/Output objects and run/testcase/stage UI selection during live polling.
+- Add v1.8.9 regressions; release suite is **225 tests**.
+
 ## 1.8.8
 
 - Promote application to **v1.8.8** with embedded **RCA Core v0.8.7 candidate** after the complete 17-case RunPod suite exposed systemic semantic-contract defects beyond TC17.

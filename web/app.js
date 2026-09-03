@@ -13,6 +13,7 @@ const defaultProfiles = [
 const state = {
   profiles: loadProfiles(), profile: null, config: null, capabilities: null, system: null,
   activeRunId: null, pollTimer: null, selectedStageId: null, selectedCaseId: null,
+  expandedPaths: new Set(), scrollPositions: {},
   modelCatalogs: {primary: [], small: []}, lastRun: null,
 };
 
@@ -38,6 +39,11 @@ async function api(path,opts={}){
 function escapeHtml(x){return String(x).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function labelize(x){return String(x).replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());}
 function safeJson(text){if(typeof text!=='string'||!text.trim())return null;try{return JSON.parse(text)}catch{return null;}}
+function viewKey(suffix=''){return `${state.profile?.id||'default'}|${state.activeRunId||''}|${state.selectedCaseId||''}|${state.selectedStageId||''}${suffix?`|${suffix}`:''}`;}
+function persistRunView(){if(!state.activeRunId)return;localStorage.setItem(`rca.runView.${state.profile?.id||'default'}.${state.activeRunId}`,JSON.stringify({case_id:state.selectedCaseId,stage_id:state.selectedStageId}));}
+function restoreRunView(id){try{const x=JSON.parse(localStorage.getItem(`rca.runView.${state.profile?.id||'default'}.${id}`)||'null');if(x){state.selectedCaseId=x.case_id||null;state.selectedStageId=x.stage_id||null;}}catch{}}
+function captureStructuredState(container){const scope=viewKey(container.id);container.querySelectorAll('details[data-tree-path]').forEach(d=>{const k=`${scope}|${d.dataset.treePath}`;if(d.open)state.expandedPaths.add(k);else state.expandedPaths.delete(k)});state.scrollPositions[scope]=container.scrollTop||0;}
+function bindDetailState(det,container,path,defaultOpen=false){det.dataset.treePath=path;const k=`${viewKey(container.id)}|${path}`;det.open=state.expandedPaths.has(k)||(!state.expandedPaths.has(k)&&defaultOpen);det.addEventListener('toggle',()=>{if(det.open)state.expandedPaths.add(k);else state.expandedPaths.delete(k);});}
 
 function initProfiles(){
   const sel=$('profileSelect');sel.innerHTML='';state.profiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.append(o)});
@@ -57,7 +63,17 @@ async function connectBackend(preserveEdits=false){
   const draft=(preserveEdits&&state.config)?collectConfig():null;saveCurrentProfile();setConnection(false,'CONNECTING');
   const [health,system,caps,cfg]=await Promise.all([api('/health'),api('/system'),api('/capabilities'),api('/config')]);state.system=system;state.capabilities=caps;state.config=draft||cfg;setConnection(true,'CONNECTED');
   $('backendVersion').textContent=`App v${health.backend_version} · Core v${health.core_version||'?'} · ${health.profile_name}`;$('hardwareSummary').textContent=hardwareLabel(system);$('primarySummary').textContent=cfg.primary_model?.model||'not configured';$('smallSummary').textContent=cfg.small_model?.model||'not configured';$('systemView').textContent=pretty({health,system});$('capabilitiesRaw').textContent=pretty(caps);
-  renderCapabilities();if(!draft)fillConfig();renderEnvironmentOverrides();await refreshHistory();if(state.activeRunId){try{await loadRun(state.activeRunId,true)}catch{state.activeRunId=null}}toast('Backend connected.');
+  renderCapabilities();if(!draft)fillConfig();renderEnvironmentOverrides();const runs=await refreshHistory();await reconcileActiveRuns(runs);toast('Backend connected.');
+}
+async function reconcileActiveRuns(runs){
+  const active=(runs||[]).filter(r=>['QUEUED','INITIALIZING','RUNNING','CANCELLING'].includes(r.status));
+  const bar=$('activeRunBar'),sel=$('activeRunSelect');sel.innerHTML='';
+  active.forEach(r=>{const o=document.createElement('option');o.value=r.run_id;o.textContent=`${r.run_id} · ${r.status}${r.current_stage?` · ${r.current_stage}`:''}`;sel.append(o)});bar.hidden=active.length<2;
+  const remembered=state.activeRunId&&active.find(r=>r.run_id===state.activeRunId);
+  const target=remembered||(active.length===1?active[0]:null);
+  if(target){await loadRun(target.run_id,true);if(sel.options.length)sel.value=target.run_id;}
+  else if(active.length>1){toast(`${active.length} active runs found. Select one to reconnect.`);}
+  else if(state.activeRunId){try{await loadRun(state.activeRunId,true)}catch{state.activeRunId=null;}}
 }
 function setConnection(ok,label){const b=$('connectionBadge');b.textContent=label;b.className=`badge ${ok?'online':'offline'}`;}
 function hardwareLabel(s){const g=s?.gpus?.map(x=>x.name).join(' + ');return g||`${s?.cpu_count_logical||'?'} CPU threads · ${s?.ram_total_gb||'?'} GB RAM`;}
@@ -70,7 +86,7 @@ function renderCapabilities(){
 function renderEnvironmentOverrides(){
   const overrides=state.capabilities?.environment_overrides||{},box=$('modelOverrideWarning');const rows=Object.entries(overrides);
   if(!rows.length){box.textContent='';box.hidden=true;box.classList.remove('show');return;}box.hidden=false;box.classList.add('show');
-  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.8 run-specific configuration overrides remain authoritative for the run you start.</span>`;
+  box.innerHTML=`<strong>Active deployment environment overrides</strong><br>${rows.map(([field,x])=>`${escapeHtml(field)} ← ${escapeHtml(x.env)} = ${escapeHtml(x.value)}`).join('<br>')}<br><span>Saved values may differ from effective backend defaults. v1.8.9 run-specific configuration overrides remain authoritative for the run you start.</span>`;
 }
 
 const configMap={
@@ -103,19 +119,22 @@ async function refreshModels(){await Promise.allSettled([discoverModel('primary'
 async function testModel(role){const config=roleFormConfig(role);const r=await api('/models/test',{method:'POST',body:JSON.stringify({role,config})});if(r.catalog){state.modelCatalogs[role]=r.catalog;renderModelHint(role,r.catalog)}toast(`${role}: ${r.message}`,!r.ok);return r;}
 
 function renderStructured(container,data,{raw=true,empty='No data available.'}={}){
-  container.replaceChildren();if(data===undefined||data===null||(Array.isArray(data)&&!data.length)||(typeof data==='object'&&!Array.isArray(data)&&!Object.keys(data).length)){const e=document.createElement('div');e.className='structured-empty';e.textContent=empty;container.append(e);return;}
-  container.append(buildStructuredNode(data,'',0));
-  if(raw){const d=document.createElement('details');d.className='raw-json';const s=document.createElement('summary');s.textContent='Raw JSON';const p=document.createElement('pre');p.textContent=pretty(data);d.append(s,p);container.append(d);}
+  captureStructuredState(container);
+  const scope=viewKey(container.id),savedScroll=state.scrollPositions[scope]||0;
+  container.replaceChildren();if(data===undefined||data===null||(Array.isArray(data)&&!data.length)||(typeof data==='object'&&!Array.isArray(data)&&!Object.keys(data).length)){const e=document.createElement('div');e.className='structured-empty';e.textContent=empty;container.append(e);container.scrollTop=savedScroll;return;}
+  container.append(buildStructuredNode(data,'',0,'root',container));
+  if(raw){const d=document.createElement('details');d.className='raw-json';const s=document.createElement('summary');s.textContent='Raw JSON';const p=document.createElement('pre');p.textContent=pretty(data);bindDetailState(d,container,'raw-json',false);d.append(s,p);container.append(d);}
+  container.scrollTop=savedScroll;
 }
-function buildStructuredNode(value,key,depth){
+function buildStructuredNode(value,key,depth,path='root',container=null){
   if(value===null||typeof value!=='object'){const row=document.createElement('div');row.className='kv-row';if(key){const k=document.createElement('span');k.className='kv-key';k.textContent=labelize(key);row.append(k)}const v=document.createElement('span');v.className='kv-value';v.textContent=value===null?'—':String(value);row.append(v);return row;}
   if(Array.isArray(value)){
     const box=document.createElement('div');box.className='structured-array';if(key){const h=document.createElement('div');h.className='structured-heading';h.textContent=`${labelize(key)} (${value.length})`;box.append(h)}
-    if(!value.length){box.append(buildStructuredNode('None','',depth+1));return box;}
-    value.forEach((item,i)=>{if(item&&typeof item==='object'){const det=document.createElement('details');det.className='structured-card';det.open=depth<1;const sum=document.createElement('summary');const identity=item.requirement_id||item.evidence_id||item.fact_id||item.case_id||item.stage||item.issue_id||`Item ${i+1}`;sum.textContent=String(identity);det.append(sum,buildStructuredNode(item,'',depth+1));box.append(det)}else box.append(buildStructuredNode(item,`${i+1}`,depth+1));});return box;
+    if(!value.length){box.append(buildStructuredNode('None','',depth+1,`${path}/empty`,container));return box;}
+    value.forEach((item,i)=>{if(item&&typeof item==='object'){const det=document.createElement('details');det.className='structured-card';const sum=document.createElement('summary');const identity=item.requirement_id||item.evidence_id||item.fact_id||item.case_id||item.stage_id||item.stage||item.issue_id||`Item ${i+1}`;sum.textContent=String(identity);const itemPath=`${path}/${key||'array'}/${identity}`;if(container)bindDetailState(det,container,itemPath,depth<1);det.append(sum,buildStructuredNode(item,'',depth+1,itemPath,container));box.append(det)}else box.append(buildStructuredNode(item,`${i+1}`,depth+1,`${path}/${i}`,container));});return box;
   }
   const box=document.createElement('div');box.className='structured-object';if(key){const h=document.createElement('div');h.className='structured-heading';h.textContent=labelize(key);box.append(h)}
-  const entries=Object.entries(value);const scalars=entries.filter(([,v])=>v===null||typeof v!=='object'),nested=entries.filter(([,v])=>v!==null&&typeof v==='object');if(scalars.length){const grid=document.createElement('div');grid.className='kv-grid';scalars.forEach(([k,v])=>grid.append(buildStructuredNode(v,k,depth+1)));box.append(grid)}nested.forEach(([k,v])=>box.append(buildStructuredNode(v,k,depth+1)));return box;
+  const entries=Object.entries(value);const scalars=entries.filter(([,v])=>v===null||typeof v!=='object'),nested=entries.filter(([,v])=>v!==null&&typeof v==='object');if(scalars.length){const grid=document.createElement('div');grid.className='kv-grid';scalars.forEach(([k,v])=>grid.append(buildStructuredNode(v,k,depth+1,`${path}/${k}`,container)));box.append(grid)}nested.forEach(([k,v])=>box.append(buildStructuredNode(v,k,depth+1,`${path}/${k}`,container)));return box;
 }
 function renderTable(container,headers,items,rowFn,onClick){const t=document.createElement('table');t.innerHTML=`<thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>`;const b=document.createElement('tbody');items.forEach(item=>{const tr=document.createElement('tr');if(onClick){tr.className='clickable';tr.onclick=()=>onClick(item)};tr.innerHTML=rowFn(item).map(x=>`<td>${escapeHtml(x??'')}</td>`).join('');b.append(tr)});t.append(b);container.replaceChildren(t);}
 
@@ -127,7 +146,7 @@ async function startRun(req){
 function startPolling(){if(state.pollTimer)clearInterval(state.pollTimer);state.pollTimer=setInterval(()=>refreshRun().catch(e=>console.warn(e)),1800);}
 function stopPolling(){if(state.pollTimer){clearInterval(state.pollTimer);state.pollTimer=null;}}
 async function refreshRun(){if(!state.activeRunId)return;const [summary,pipeline,logs,metrics,result]=await Promise.all([api(`/runs/${state.activeRunId}/status`),api(`/runs/${state.activeRunId}/pipeline`),api(`/runs/${state.activeRunId}/logs`),api(`/runs/${state.activeRunId}/metrics`).catch(()=>({})),api(`/runs/${state.activeRunId}/result`).catch(()=>({}))]);state.lastRun={summary,pipeline,logs,metrics,result};renderRun(summary,pipeline,logs,metrics,result);if(terminal.has(summary.status)){stopPolling();await refreshHistory();}}
-async function loadRun(id,resume=false){state.activeRunId=id;state.selectedCaseId=null;localStorage.setItem(`rca.activeRun.${state.profile.id}`,id);$('runSummary').textContent=id;await refreshRun();if(!terminal.has($('runStateBadge').textContent||''))startPolling();if(!resume)switchTab('results');}
+async function loadRun(id,resume=false){state.activeRunId=id;state.selectedCaseId=null;state.selectedStageId=null;restoreRunView(id);localStorage.setItem(`rca.activeRun.${state.profile.id}`,id);$('runSummary').textContent=id;await refreshRun();if(!terminal.has($('runStateBadge').textContent||''))startPolling();if(!resume)switchTab('results');}
 function caseRows(resultWrap,summary){
   const lifecycle=resultWrap?.case_lifecycle||[];
   if(summary?.run_type==='single')return lifecycle;
@@ -149,7 +168,7 @@ function updateCaseSelector(rows,resultMeta){
 }
 function renderBatchSummary(result){
   const cases=result?.cases||[],root=$('batchView');if(!cases.length){renderStructured(root,result,{empty:'No completed testcase results yet.'});return;}
-  const wrap=document.createElement('div');const h=document.createElement('h3');h.textContent=`Batch progress: ${result.count||cases.length}/${result.total_cases||cases.length}`;wrap.append(h);const table=document.createElement('div');wrap.append(table);renderTable(table,['Case','Execution','Semantic acceptance','Elapsed','Model time','Calls','Tokens','Tok/s'],cases,c=>{const st=c.statistics||{},sa=c.semantic_acceptance;let accept=typeof sa==='string'?sa:(sa?.accepted===true?'PASS':sa?.accepted===false?'FAIL':sa?.status||'—');return[c.case_id,c.execution_status,accept,fmtSec(st.elapsed_seconds),fmtSec(st.model_seconds),st.model_calls??0,st.total_tokens??0,st.weighted_generation_tokens_per_second??'—'];},c=>{state.selectedCaseId=c.case_id;renderRun(state.lastRun.summary,state.lastRun.pipeline,state.lastRun.logs,state.lastRun.metrics,state.lastRun.result)});root.replaceChildren(wrap);
+  const wrap=document.createElement('div');const h=document.createElement('h3');h.textContent=`Batch progress: ${result.count||cases.length}/${result.total_cases||cases.length}`;wrap.append(h);const table=document.createElement('div');wrap.append(table);renderTable(table,['Case','Execution','Semantic acceptance','Elapsed','Model time','Calls','Tokens','Tok/s'],cases,c=>{const st=c.statistics||{},sa=c.semantic_acceptance;let accept=typeof sa==='string'?sa:(sa?.accepted===true?'PASS':sa?.accepted===false?'FAIL':sa?.status||'—');return[c.case_id,c.execution_status,accept,fmtSec(st.elapsed_seconds),fmtSec(st.model_seconds),st.model_calls??0,st.total_tokens??0,st.weighted_generation_tokens_per_second??'—'];},c=>{captureStructuredState($('stageInput'));captureStructuredState($('stageOutput'));state.selectedCaseId=c.case_id;persistRunView();renderRun(state.lastRun.summary,state.lastRun.pipeline,state.lastRun.logs,state.lastRun.metrics,state.lastRun.result)});root.replaceChildren(wrap);
 }
 function fmtSec(v){if(v==null||Number.isNaN(Number(v)))return '—';const n=Number(v);if(n<60)return `${n.toFixed(2)} s`;return `${Math.floor(n/60)}m ${(n%60).toFixed(1)}s`;}
 function selectedCasePayload(record){return record?.result||record?.failure||null;}
@@ -185,7 +204,7 @@ function renderStats(metrics,caseStats,pipeline){
 function renderPipeline(stages){
   const root=$('stageList');root.innerHTML='';if(!stages.length){$('stageSummary').textContent='No pipeline stage available for this selection.';renderStructured($('stageInput'),null);renderStructured($('stageOutput'),null);state.selectedStageId=null;return;}
   if(!stages.some(x=>x.stage_id===state.selectedStageId))state.selectedStageId=stages.at(-1).stage_id;
-  stages.forEach(st=>{const d=document.createElement('div');d.className=`stage-item ${state.selectedStageId===st.stage_id?'active':''}`;d.innerHTML=`<strong><span class="stage-dot ${escapeHtml(st.status)}"></span>${escapeHtml(st.name)}</strong><small>${escapeHtml(st.status)}${st.elapsed_ms!=null?` · ${(st.elapsed_ms/1000).toFixed(1)}s`:''}</small>`;d.onclick=()=>{state.selectedStageId=st.stage_id;showStage(st);renderPipeline(stages)};root.append(d)});showStage(stages.find(x=>x.stage_id===state.selectedStageId)||stages.at(-1));
+  stages.forEach(st=>{const d=document.createElement('div');d.className=`stage-item ${state.selectedStageId===st.stage_id?'active':''}`;d.innerHTML=`<strong><span class="stage-dot ${escapeHtml(st.status)}"></span>${escapeHtml(st.name)}</strong><small>${escapeHtml(st.status)}${st.elapsed_ms!=null?` · ${(st.elapsed_ms/1000).toFixed(1)}s`:''}</small>`;d.onclick=()=>{captureStructuredState($('stageInput'));captureStructuredState($('stageOutput'));state.selectedStageId=st.stage_id;persistRunView();showStage(st);renderPipeline(stages)};root.append(d)});showStage(stages.find(x=>x.stage_id===state.selectedStageId)||stages.at(-1));
 }
 function showStage(st){
   const stats=st.metadata?.statistics||{};$('stageSummary').innerHTML=`<h3>${escapeHtml(st.name)}</h3><p><span class="badge neutral">${escapeHtml(st.status)}</span> ${escapeHtml(st.summary||'')}</p><small>${escapeHtml(st.start_time||'')}${st.elapsed_ms!=null?` · ${st.elapsed_ms} ms`:''}${stats.model_call_count?` · ${stats.model_call_count} model call(s) · ${stats.total_tokens||0} tokens`:''}</small>`;
@@ -193,17 +212,17 @@ function showStage(st){
 }
 async function cancelRun(){if(!state.activeRunId)return;await api(`/runs/${state.activeRunId}/cancel`,{method:'POST'});toast('Cancellation requested.');await refreshRun();}
 async function download(path,filename){const res=await fetch(`${apiBase()}/api/v1${path}`,{headers:authHeaders()});if(!res.ok)throw new Error(await res.text());const blob=await res.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
-async function refreshHistory(){const [runs,sessions]=await Promise.all([api('/runs'),api('/sessions')]);renderTable($('runHistory'),['Run','Type','Status','Created','Stage'],runs,r=>[r.run_id,r.run_type,r.status,new Date(r.created_at).toLocaleString(),r.current_stage||''],r=>loadRun(r.run_id));renderTable($('sessionHistory'),['Session','Status','Version','Created'],sessions,s=>[s.session_id,s.status,s.app_version||'',s.created_at?new Date(s.created_at).toLocaleString():''],s=>loadSession(s.session_id));}
+async function refreshHistory(){const [runs,sessions]=await Promise.all([api('/runs'),api('/sessions')]);renderTable($('runHistory'),['Run','Type','Status','Created','Stage'],runs,r=>[r.run_id,r.run_type,r.status,new Date(r.created_at).toLocaleString(),r.current_stage||''],r=>loadRun(r.run_id));renderTable($('sessionHistory'),['Session','Status','Version','Created'],sessions,s=>[s.session_id,s.status,s.app_version||'',s.created_at?new Date(s.created_at).toLocaleString():''],s=>loadSession(s.session_id));return runs;}
 async function loadSession(id){const s=await api(`/sessions/${id}`);renderStructured($('sessionView'),s);}
 async function importSession(file){const up=await upload(file);const r=await api('/sessions/load',{method:'POST',body:JSON.stringify({file_id:up.file_id})});renderStructured($('sessionView'),r.session);await refreshHistory();toast('Session imported/migrated.');}
 
 function switchTab(name){qsa('#mainTabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));qsa('.tab-page').forEach(p=>p.classList.toggle('active',p.id===`tab-${name}`));}
 function wireTabs(){qsa('#mainTabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));qsa('#resultTabs button').forEach(b=>b.onclick=()=>{qsa('#resultTabs button').forEach(x=>x.classList.toggle('active',x===b));qsa('.result-page').forEach(p=>p.classList.toggle('active',p.id===`result-${b.dataset.result}`))});qsa('.io-tabs button').forEach(b=>b.onclick=()=>{qsa('.io-tabs button').forEach(x=>x.classList.toggle('active',x===b));$('stageInput').classList.toggle('active',b.dataset.io==='input');$('stageOutput').classList.toggle('active',b.dataset.io==='output')});}
 function wireActions(){
-  $('profileSelect').onchange=()=>selectProfile($('profileSelect').value);$('backendToken').oninput=()=>sessionStorage.setItem(tokenKey(),$('backendToken').value);$('saveProfileBtn').onclick=saveCurrentProfile;$('testBackendBtn').onclick=()=>connectBackend(true).catch(e=>{setConnection(false,'OFFLINE');toast(e.message,true)});$('themeBtn').onclick=()=>{document.documentElement.classList.toggle('light');localStorage.setItem('rca.theme',document.documentElement.classList.contains('light')?'light':'dark')};
+  $('activeRunSelect').onchange=()=>loadRun($('activeRunSelect').value).catch(e=>toast(e.message,true));$('profileSelect').onchange=()=>selectProfile($('profileSelect').value);$('backendToken').oninput=()=>sessionStorage.setItem(tokenKey(),$('backendToken').value);$('saveProfileBtn').onclick=saveCurrentProfile;$('testBackendBtn').onclick=()=>connectBackend(true).catch(e=>{setConnection(false,'OFFLINE');toast(e.message,true)});$('themeBtn').onclick=()=>{document.documentElement.classList.toggle('light');localStorage.setItem('rca.theme',document.documentElement.classList.contains('light')?'light':'dark')};
   qsa('.exampleBtn').forEach(b=>b.onclick=async()=>{$('caseInput').value=(await api(`/examples/${b.dataset.example}`)).raw_case});$('clearBtn').onclick=()=>{$('caseInput').value='';};$('analyzeBtn').onclick=()=>startRun({run_type:'single',raw_case:$('caseInput').value,label:'Single case'}).catch(e=>toast(e.message,true));$('runBuiltinBtn').onclick=()=>startRun({run_type:'builtin_regression',label:'Built-in TEST-001 → TEST-003'}).catch(e=>toast(e.message,true));$('runBundleBtn').onclick=async()=>{try{const f=$('bundleFile').files[0];if(!f)throw new Error('Select a ZIP bundle first');const up=await upload(f);await startRun({run_type:'bundle',file_id:up.file_id,label:f.name})}catch(e){toast(e.message,true)}};$('stopBtn').onclick=()=>cancelRun().catch(e=>toast(e.message,true));
   $('reloadConfigBtn').onclick=()=>reloadConfig().catch(e=>toast(e.message,true));$('saveConfigBtn').onclick=()=>saveConfig().catch(e=>toast(e.message,true));$('saveModelConfigBtn').onclick=()=>saveConfig().catch(e=>toast(e.message,true));$('refreshModelsBtn').onclick=()=>refreshModels().catch(e=>toast(e.message,true));$('discoverPrimaryBtn').onclick=()=>discoverModel('primary').catch(e=>toast(e.message,true));$('discoverSmallBtn').onclick=()=>discoverModel('small').catch(e=>toast(e.message,true));$('testPrimaryBtn').onclick=()=>testModel('primary').catch(e=>toast(e.message,true));$('testSmallBtn').onclick=()=>testModel('small').catch(e=>toast(e.message,true));
-  $('batchCaseSelect').onchange=()=>{state.selectedCaseId=$('batchCaseSelect').value;state.selectedStageId=null;if(state.lastRun)renderRun(state.lastRun.summary,state.lastRun.pipeline,state.lastRun.logs,state.lastRun.metrics,state.lastRun.result)};
+  $('batchCaseSelect').onchange=()=>{captureStructuredState($('stageInput'));captureStructuredState($('stageOutput'));state.selectedCaseId=$('batchCaseSelect').value;state.selectedStageId=null;persistRunView();if(state.lastRun)renderRun(state.lastRun.summary,state.lastRun.pipeline,state.lastRun.logs,state.lastRun.metrics,state.lastRun.result)};
   $('refreshHistoryBtn').onclick=()=>refreshHistory().catch(e=>toast(e.message,true));$('sessionFile').onchange=()=>{const f=$('sessionFile').files[0];if(f)importSession(f).catch(e=>toast(e.message,true))};$('downloadReportBtn').onclick=()=>download(`/runs/${state.activeRunId}/report/download`,`${state.activeRunId}-RCA_Report.md`).catch(e=>toast(e.message,true));$('downloadSessionBtn').onclick=()=>download(`/runs/${state.activeRunId}/session/download`,`${state.activeRunId}-RCA_Session.json`).catch(e=>toast(e.message,true));
 }
 async function boot(){if(localStorage.getItem('rca.theme')==='light')document.documentElement.classList.add('light');wireTabs();initProfiles();wireActions();if(state.profile?.auto_connect&&state.profile.backend_url){connectBackend().catch(e=>{setConnection(false,'OFFLINE');console.warn(e)})}}

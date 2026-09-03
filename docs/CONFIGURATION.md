@@ -1,4 +1,4 @@
-# RCA Analyst v1.8.8 Configuration Reference
+# RCA Analyst v1.8.9 Configuration Reference
 
 ## Top-level application configuration
 
@@ -24,7 +24,7 @@ Each role contains:
 - `transport`
 - `api_token_env`
 
-`context_size` is expected/provider metadata in v1.8.8; it does not reconfigure an already-running external model server.
+`context_size` is expected/provider metadata in v1.8.9; it does not reconfigure an already-running external model server.
 
 ### `model_routing` — new in v1.8.7
 
@@ -46,9 +46,9 @@ Allowed roles are `small` and `primary`.
 - changing these fields changes model capacity/transport only. Python retains deterministic compliance authority.
 
 
-### v1.8.8 semantic-contract note
+### v1.8.9 semantic-contract note
 
-v1.8.8 does not add testcase-specific tuning controls. Missing Requirement IR recovery, provenance completion, source grounding, materiality and RCA fact-ID validation are core contracts. Critical Semantic Model Routing remains the mechanism for choosing Small / Utility or Primary capacity for semantic preparation and verification.
+v1.8.9 does not add testcase-specific tuning controls. Missing Requirement IR recovery, provenance completion, source grounding, materiality and RCA fact-ID validation are core contracts. Critical Semantic Model Routing remains the mechanism for choosing Small / Utility or Primary capacity for semantic preparation and verification.
 
 Keep model/server settings stable across a live regression batch. Changing context, reasoning, routing or token budgets mid-run invalidates performance comparisons and can obscure whether a semantic-core fix worked.
 
@@ -73,7 +73,7 @@ Fields remain preserved:
 - `context_size_override`
 - `provider_options`
 
-Important v1.8.8 behavior: the FastAPI backend does not currently own external LM Studio/llama.cpp/vLLM process lifecycle. Consequently these controls are capability-disabled unless a deployment adapter explicitly advertises backend ownership. They must not imply that editing the Web form changes `llama-server -c`, GPU layers, Flash Attention, etc.
+Important v1.8.9 behavior: the FastAPI backend does not currently own external LM Studio/llama.cpp/vLLM process lifecycle. Consequently these controls are capability-disabled unless a deployment adapter explicitly advertises backend ownership. They must not imply that editing the Web form changes `llama-server -c`, GPU layers, Flash Attention, etc.
 
 ## Environment overrides
 
@@ -92,7 +92,7 @@ Deployment variables include:
 - `RCA_SMALL_PROVIDER`
 - model API-token environment variables such as `LM_API_TOKEN`.
 
-The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.8 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
+The six model endpoint/model/provider environment variables override file configuration when the backend loads its deployment defaults. v1.8.9 exposes these active overrides in `/capabilities` and the Web UI so a successful save cannot misleadingly appear to disappear without explanation.
 
 A Web-started run additionally supplies the current form through `config_override`. That run snapshot is authoritative for that run and is persisted in `config_snapshot.json`/session metadata.
 
@@ -104,4 +104,9 @@ There are three distinct concepts:
 2. actual server runtime context, e.g. llama.cpp `-c 8192`;
 3. RCA configuration metadata/expectation.
 
-Only (2) controls the running server's real context window. v1.8.8 model discovery displays provider-advertised runtime context when available so mismatches are visible.
+Only (2) controls the running server's real context window. v1.8.9 model discovery displays provider-advertised runtime context when available so mismatches are visible.
+
+
+## v1.8.9 Web state
+
+Active-run rediscovery is backend-driven and requires no new RCA semantic configuration. Browser local state stores only UI preferences/selection hints. Critical semantic routing remains explicit and should be verified from the run/session model-call telemetry.

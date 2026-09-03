@@ -1,8 +1,8 @@
 # RCA Analyst — Product Requirements Document (PRD)
 
-**Current application release:** v1.8.8  
-**Current RCA semantic-core baseline:** v0.8.7 candidate  
-**Validation status:** automated release gates are required. RCA Core v0.8.7 remains unfrozen until the exact v1.8.8 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors inside that rerun.
+**Current application release:** v1.8.9  
+**Current RCA semantic-core baseline:** v0.8.8 candidate  
+**Validation status:** automated release gates are required. RCA Core v0.8.8 remains unfrozen until the exact v1.8.9 package passes a stable live full-suite rerun. TC17 and TC12 remain explicit semantic anchors inside that rerun.
 
 ## 1. Product vision
 
@@ -97,7 +97,7 @@ Preserve all established rules, including:
 - transport-valid IR is not automatically executable IR;
 - same-signal overlap alone is insufficient evidence materiality.
 
-## 7. Current RCA Core v0.8.7 pipeline
+## 7. Current RCA Core v0.8.8 pipeline
 
 ```text
 RAW CASE
@@ -145,7 +145,7 @@ RAW CASE
 
 ### v0.8.7 full-suite hardening
 
-The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic semantic-contract failures. v0.8.7 therefore adds:
+The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic semantic-contract failures. v0.8.7 therefore added:
 
 - expected Requirement-ID completeness validation and one bounded missing-ID recompilation;
 - complete source-clause audit inventory as a structural-completion target;
@@ -159,19 +159,19 @@ The complete v1.8.7 RunPod regression executed all 17 cases but exposed systemic
 
 None of these changes add Python natural-language meaning extraction or weaken evidence/compliance conservatism.
 
-## 9. Current application architecture v1.8.8
+## 9. Current application architecture v1.8.9
 
 ```text
 Same Web UI
 → FastAPI /api/v1
 → backend-owned Run Manager / Storage / Sessions / Telemetry
-→ RCA Core v0.8.7
+→ RCA Core v0.8.8
 → ModelGateway
 → OpenAI-compatible LM Studio / llama.cpp / vLLM / future provider
 → Dell / RunPod / Home
 ```
 
-v1.8.8 retains all v1.8.6/v1.8.7 Web/model improvements and adds authoritative testcase lifecycle:
+v1.8.9 retains all v1.8.6/v1.8.7 Web/model improvements and adds authoritative testcase lifecycle:
 
 - case enters the Tests list as `RUNNING` before pipeline execution;
 - the same lifecycle row updates to PASS/FAILED/CANCELLED;
@@ -236,3 +236,8 @@ Every release must:
 9. contain no caches/pyc/Git/virtualenv junk;
 10. include required docs;
 11. record SHA-256.
+
+
+## v1.8.9 acceptance delta
+
+The application must automatically rediscover still-running backend runs after browser reconnect; live pipeline inspection state must survive polling. RCA Core must allow VERIFIED facts to participate in any structurally matching Requirement IR, require all targeted structural fields, merge arbitration atomically, route known diagnostic/history classes canonically, retain unresolved normative context for RCA, and validate hypothesis machine IDs independently from display references.

@@ -120,9 +120,31 @@ class RCAEvidencePacketBuilder:
             for rr in validated.requirement_results
             if rr.analysis.applicability.value == "APPLICABLE" or rr.evaluation_status.value == "VIOLATED"
         }
+        # Keep requirements with material semantic-integrity blockers visible to
+        # RCA as unresolved normative context. They are not executable truth, but
+        # disappearing them can make RCA falsely claim that no requirement exists.
+        relevant_req_ids.update(
+            issue.requirement_id
+            for issue in canonical.semantic_integrity_issues
+            if issue.material_to_compliance and issue.requirement_id
+        )
         requirement_irs: List[RequirementIR] = [
             ir for ir in preparation.requirement_irs if ir.requirement_id in relevant_req_ids
         ]
+        unresolved_requirement_context = []
+        for rid in sorted(relevant_req_ids):
+            blockers = [
+                issue for issue in canonical.semantic_integrity_issues
+                if issue.material_to_compliance and issue.requirement_id == rid
+            ]
+            if blockers:
+                source = next((r for r in canonical.requirements if r.requirement_id == rid), None)
+                unresolved_requirement_context.append({
+                    "requirement_id": rid,
+                    "requirement_text": (source.raw_source_text or source.requirement_text) if source else "",
+                    "status": "STRUCTURED_SEMANTICS_UNRESOLVED",
+                    "issues": [x.model_dump(mode="json") for x in blockers],
+                })
 
         verified_evidence = []
         diagnostics = []
@@ -149,17 +171,12 @@ class RCAEvidencePacketBuilder:
                 }
                 if fact.resolution == SemanticResolution.VERIFIED:
                     verified_evidence.append(base)
-                    if (
-                        EvidenceSemanticRole.DIAGNOSTIC in fact.possible_roles
-                        and item is not None
-                        and item.source == "Current BZD / Diagnostics"
-                    ):
+                    # Canonical source classification is authoritative.  The
+                    # model's possible_roles are supplementary and are not
+                    # required to rediscover an already-known source class.
+                    if item is not None and item.source == "Current BZD / Diagnostics":
                         diagnostics.append(base)
-                    if (
-                        EvidenceSemanticRole.HISTORICAL in fact.possible_roles
-                        and item is not None
-                        and item.evidence_class == EvidenceClass.HISTORICAL_EVIDENCE
-                    ):
+                    if item is not None and item.evidence_class == EvidenceClass.HISTORICAL_EVIDENCE:
                         historical.append(base)
                 else:
                     unresolved.append(base)
@@ -196,6 +213,7 @@ class RCAEvidencePacketBuilder:
             deterministic_facts=deterministic_facts,
             diagnostics=diagnostics,
             historical=historical,
+            unresolved_requirement_context=unresolved_requirement_context,
             unresolved_rca_context=unresolved,
             selected_source_excerpts=[],
         )

@@ -142,3 +142,11 @@ v1.8.7 does not change desktop/Web feature ownership. It closes a provider-integ
 The Web Tests selector is now present for both single and batch runs and is backed by backend testcase lifecycle state. A testcase appears as soon as it starts (`RUNNING`) rather than only after completion. Users may inspect a completed testcase and switch back to the live running testcase. Result-only tabs explicitly remain unavailable until that testcase completes; Live Pipeline, Logs and partial Stats continue to update.
 
 This closes a Web-only parity/observability gap and does not add RCA decision logic to the browser.
+
+
+## v1.8.9 live Web UX addendum
+
+- Active backend runs are rediscovered after browser reconnect.
+- Single and batch running testcases remain selectable through their lifecycle.
+- Pipeline Input/Output expansion state survives live polling rerenders.
+- Testcase/stage selection is restored per run where available.

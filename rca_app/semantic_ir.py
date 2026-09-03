@@ -449,9 +449,12 @@ class SemanticIntegrityChecker:
                 )
 
         for note in preparation.unresolved_case_semantics:
-            add(f"Case-level semantic ambiguity remains unresolved: {note}", material=True)
+            # Free-form case notes are audit/context only. A compliance blocker
+            # must be represented by a structured material requirement/evidence
+            # issue that identifies the executable dependency.
+            add(f"Case-level semantic ambiguity remains unresolved: {note}", material=False)
 
-        # Explicit structured dependency materiality only.  v0.8.7 removes
+        # Explicit structured dependency materiality only.  v0.8.8 removes
         # the previous same-signal-name promotion: matching a requirement signal
         # is not itself evidence that an unresolved narrative fact lies on that
         # requirement's compliance dependency.
@@ -497,18 +500,61 @@ class SemanticIntegrityChecker:
 
 
 class SemanticArbitrationMerger:
-    """Merge one case-level arbitration response without semantic inference."""
+    """Merge one case-level arbitration response without semantic inference.
+
+    Existing Requirement IRs are field-patched only for Python-approved target
+    fields. Full Requirement IR objects can recover a missing compiler candidate
+    but can never replace an existing IR. Evidence annotations remain complete
+    replacements for explicitly targeted evidence IDs.
+    """
 
     @staticmethod
-    def apply(preparation: SemanticPreparation, arbitration: SemanticArbitrationResponse) -> SemanticPreparation:
+    def apply(
+        preparation: SemanticPreparation,
+        arbitration: SemanticArbitrationResponse,
+        requirement_targets=None,
+        evidence_targets=None,
+    ) -> SemanticPreparation:
         out = copy.deepcopy(preparation)
-        req_updates = {x.requirement_id: x for x in arbitration.requirement_irs}
-        out.requirement_irs = [copy.deepcopy(req_updates.get(x.requirement_id, x)) for x in out.requirement_irs]
-        known_req = {x.requirement_id for x in out.requirement_irs}
-        out.requirement_irs.extend(copy.deepcopy(x) for x in arbitration.requirement_irs if x.requirement_id not in known_req)
+        requirement_targets = requirement_targets or {}
+        evidence_targets = set(evidence_targets or set())
 
-        ann_updates = {x.evidence_id: x for x in arbitration.evidence_annotations}
-        out.evidence_annotations = [copy.deepcopy(ann_updates.get(x.evidence_id, x)) for x in out.evidence_annotations]
+        patch_updates = {x.requirement_id: x for x in arbitration.requirement_patches}
+        full_updates = {x.requirement_id: x for x in arbitration.requirement_irs}
+        by_id = {x.requirement_id: x for x in out.requirement_irs}
+
+        for rid, fields in requirement_targets.items():
+            current = by_id.get(rid)
+            if current is None:
+                if rid in full_updates:
+                    recovered = copy.deepcopy(full_updates[rid])
+                    out.requirement_irs.append(recovered)
+                    by_id[rid] = recovered
+                continue
+            patch = patch_updates.get(rid)
+            replacement = full_updates.get(rid)
+            for field in fields:
+                if patch is not None and field in patch.model_fields_set:
+                    value = getattr(patch, field)
+                    if value is not None:
+                        setattr(current, field, copy.deepcopy(value))
+                elif replacement is not None and hasattr(replacement, field):
+                    # Backward-compatible full IR output is never authoritative
+                    # as a whole: copy only Python-approved target fields.
+                    value = getattr(replacement, field)
+                    if value is not None:
+                        setattr(current, field, copy.deepcopy(value))
+
+        ann_updates = {
+            x.evidence_id: x for x in arbitration.evidence_annotations
+            if not evidence_targets or x.evidence_id in evidence_targets
+        }
+        out.evidence_annotations = [
+            copy.deepcopy(ann_updates.get(x.evidence_id, x)) for x in out.evidence_annotations
+        ]
         known_ev = {x.evidence_id for x in out.evidence_annotations}
-        out.evidence_annotations.extend(copy.deepcopy(x) for x in arbitration.evidence_annotations if x.evidence_id not in known_ev)
+        out.evidence_annotations.extend(
+            copy.deepcopy(x) for x in arbitration.evidence_annotations
+            if x.evidence_id not in known_ev and (not evidence_targets or x.evidence_id in evidence_targets)
+        )
         return out

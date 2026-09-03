@@ -728,21 +728,22 @@ class RequirementCompilationBatch(StrictModel):
 
 
 class RequirementStructuralPatch(StrictModel):
-    """Explicit model-authored patch for transport-valid but non-executable IR fields.
+    """Explicit model-authored patch for targeted Requirement IR fields.
 
-    All fields are optional because Python supplies the exact target-field list in
-    the request and rejects patches that modify untargeted fields. Python merges
-    only these structured objects; it never derives their semantics from prose.
-    ``source_clauses`` is a complete replacement audit inventory when targeted;
-    it is not appended piecemeal, which keeps provenance deterministic.
+    Python supplies the exact target-field list and rejects patches that modify
+    untargeted fields. Python merges only these structured objects; it never
+    derives their semantics from prose. ``source_clauses`` is a complete
+    replacement audit inventory when targeted; it is not appended piecemeal.
     """
 
     requirement_id: str
+    normative_type: Optional[NormativeType] = None
     condition: Optional[LogicExpression] = None
     trigger: Optional[RequirementEventIR] = None
     required_behavior: Optional[RequirementBehaviorIR] = None
     timing: Optional[RequirementTimingIR] = None
     persistence: Optional[RequirementPersistenceIR] = None
+    relationships: Optional[List[RequirementRelationshipIR]] = None
     source_clauses: Optional[List[RequirementSemanticClause]] = None
 
 
@@ -799,17 +800,19 @@ class SemanticIntegrityIssue(StrictModel):
     semantic_id: str = ""
     description: str
     material_to_compliance: bool = False
+    target_fields: List[str] = Field(default_factory=list)
 
 
 class SemanticArbitrationResponse(StrictModel):
-    """One case-level 27B arbitration response containing only requested repairs.
+    """One case-level 27B arbitration response containing issue-scoped repairs.
 
-    Any RequirementIR returned here is a *replacement repair*, not another
-    candidate sketch. If the source cannot be resolved, the arbitrator must
-    leave the requirement out of ``requirement_irs`` and report the blocking
-    issue IDs in ``unresolved_issue_ids`` instead.
+    v0.8.8 uses field-level RequirementStructuralPatch objects so arbitration
+    cannot accidentally overwrite already-verified Requirement IR fields.
+    ``requirement_irs`` remains accepted for missing-compiler-candidate recovery
+    and backward-compatible session deserialization only.
     """
 
+    requirement_patches: List[RequirementStructuralPatch] = Field(default_factory=list)
     requirement_irs: List[RequirementIR] = Field(default_factory=list)
     evidence_annotations: List[EvidenceSemanticAnnotation] = Field(default_factory=list)
     unresolved_issue_ids: List[str] = Field(default_factory=list)
@@ -968,6 +971,7 @@ class RCAEvidencePacket(StrictModel):
     deterministic_facts: List[dict] = Field(default_factory=list)
     diagnostics: List[dict] = Field(default_factory=list)
     historical: List[dict] = Field(default_factory=list)
+    unresolved_requirement_context: List[dict] = Field(default_factory=list)
     unresolved_rca_context: List[dict] = Field(default_factory=list)
     selected_source_excerpts: List[dict] = Field(default_factory=list)
 

@@ -1,11 +1,11 @@
-# RCA Analyst v1.8.8 — Web UI + Hardware-Independent RCA Backend
+# RCA Analyst v1.8.9 — Web UI + Hardware-Independent RCA Backend
 
-**Application version:** v1.8.8  
-**Embedded RCA Core:** v0.8.7 candidate
+**Application version:** v1.8.9  
+**Embedded RCA Core:** v0.8.8 candidate
 
-v1.8.8 is the full-suite semantic-contract and live-testcase-lifecycle hardening release built from the clean v1.8.7 package. It addresses systemic defects observed across the complete 17-case RunPod regression: missing Requirement IRs, incomplete executable/provenance fields, over-broad evidence materiality, brittle source grounding, RCA semantic-fact provenance, false-clean semantic acceptance, and the Tests selector lifecycle gap.
+v1.8.9 is the full-suite semantic-contract and live-testcase-lifecycle hardening release built from the validated v1.8.8 package. It addresses systemic defects observed across the complete 17-case RunPod regression: missing Requirement IRs, incomplete executable/provenance fields, over-broad evidence materiality, brittle source grounding, RCA semantic-fact provenance, false-clean semantic acceptance, and the Tests selector lifecycle gap.
 
-RCA Core v0.8.7 is **not frozen** until the exact v1.8.8 package passes live full-suite validation. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
+RCA Core v0.8.8 is **not frozen** until the exact v1.8.9 package passes live full-suite validation. Frozen anchors remain v0.4.3 TEST-003 and v0.5.2 TC1–TC3, with v0.3.6 TEST-001 retained as an earlier checkpoint.
 
 ## Architecture at a glance
 
@@ -17,7 +17,7 @@ RCA Backend API /api/v1
     │
     ├── asynchronous Run Manager
     ├── Storage / Sessions / History / Telemetry
-    ├── RCA Core v0.8.7
+    ├── RCA Core v0.8.8
     │       │
     │       ├── Small / Utility model roles
     │       ├── Critical Semantic Model Routing
@@ -35,7 +35,7 @@ RCA Backend API /api/v1
 
 The browser contains **zero RCA decision logic**. Model capacity may change by role, but Python remains authoritative for deterministic applicability/compliance/timing/evidence mechanics.
 
-## v1.8.8 highlights
+## v1.8.9 highlights
 
 - bounded missing-Requirement-ID recovery when a compiler batch silently omits one or more authoritative requirements;
 - complete source-clause audit inventory as a first-class targeted structural-completion field;
@@ -49,7 +49,7 @@ The browser contains **zero RCA decision logic**. Model capacity may change by r
 - universal Tests selector with RUNNING testcase lifecycle for both single and batch runs;
 - v1.8.7 Thinking Off propagation and reasoning observability, plus v1.8.6 critical semantic model routing and Web/backend parity fixes, remain intact.
 
-See [`docs/V1.8.8_RELEASE_NOTES.md`](docs/V1.8.8_RELEASE_NOTES.md) for the live full-suite evidence and exact changes.
+See [`docs/V1.8.9_RELEASE_NOTES.md`](docs/V1.8.9_RELEASE_NOTES.md) for the live full-suite evidence and exact changes.
 
 ## Start the local Web application
 
@@ -78,7 +78,7 @@ This lets RunPod test a stronger semantic model without changing utility intake/
 
 ## External model-server context and inference settings
 
-The v1.8.8 backend does **not** start/restart external LM Studio/llama.cpp/vLLM processes. Therefore a server launched as:
+The v1.8.9 backend does **not** start/restart external LM Studio/llama.cpp/vLLM processes. Therefore a server launched as:
 
 ```text
 llama-server ... -c 8192
@@ -142,7 +142,7 @@ RCA_PRIMARY_PROVIDER=openai-compatible
 RCA_SMALL_PROVIDER=openai-compatible
 ```
 
-These remain deployment-time defaults. v1.8.8 exposes active overrides in the Web UI and snapshots the current form into each run's `config_override`, avoiding the v1.8.5 ambiguity where a save could appear to revert after an environment override was reapplied.
+These remain deployment-time defaults. v1.8.9 exposes active overrides in the Web UI and snapshots the current form into each run's `config_override`, avoiding the v1.8.5 ambiguity where a save could appear to revert after an environment override was reapplied.
 
 ## Remote security
 
@@ -173,15 +173,15 @@ Do not remove it until Web parity is live-proven.
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current v1.8.8 application architecture
-- [`docs/RCA_CORE_ARCHITECTURE_v0.8.7.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.7.md) — current semantic-core architecture
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current v1.8.9 application architecture
+- [`docs/RCA_CORE_ARCHITECTURE_v0.8.8.md`](docs/RCA_CORE_ARCHITECTURE_v0.8.8.md) — current semantic-core architecture
 - [`docs/DESKTOP_UI_MIGRATION_MATRIX.md`](docs/DESKTOP_UI_MIGRATION_MATRIX.md) — desktop → Web parity contract
 - [`docs/API.md`](docs/API.md)
 - [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - [`docs/DEPLOY_LOCAL_DELL.md`](docs/DEPLOY_LOCAL_DELL.md)
 - [`docs/DEPLOY_RUNPOD.md`](docs/DEPLOY_RUNPOD.md)
 - [`docs/DEPLOY_HOME_AI_SERVER.md`](docs/DEPLOY_HOME_AI_SERVER.md)
-- [`docs/V1.8.8_RELEASE_NOTES.md`](docs/V1.8.8_RELEASE_NOTES.md)
+- [`docs/V1.8.9_RELEASE_NOTES.md`](docs/V1.8.9_RELEASE_NOTES.md)
 - [`VERSION_HISTORY.md`](VERSION_HISTORY.md)
 - [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -193,6 +193,6 @@ Historical v0.8.4/v1.8.4/v1.8.5 architecture and release documents remain packag
 pytest -q
 ```
 
-v1.8.8 release validation: **216 passed** in the working tree and **216 passed** from a clean fresh extraction.
+v1.8.9 release validation: **225 passed** in the working tree and **225 passed** from a clean fresh extraction.
 
-Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun the complete live regression bundle with a stable model configuration. TC17 and TC12 remain explicit semantic anchors within that run. Do not consider RCA Core v0.8.7 frozen until live full-suite acceptance succeeds.
+Automated tests prove software/regression contracts only. They do not constitute live-model acceptance. After release packaging, rerun the complete live regression bundle with a stable model configuration. TC17 and TC12 remain explicit semantic anchors within that run. Do not consider RCA Core v0.8.8 frozen until live full-suite acceptance succeeds.

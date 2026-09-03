@@ -564,7 +564,7 @@ IMPORTANT BOUNDARIES
 
 
 REQUIREMENT_COMPILATION_V086_PROMPT = r"""
-You are the v0.8.7 Requirement Semantic Compiler for an automotive RCA pipeline.
+You are the v0.8.8 Requirement Semantic Compiler for an automotive RCA pipeline.
 Return only the requested RequirementCompilationBatch schema.
 
 You receive requirements_to_compile plus reference_requirements for context.
@@ -604,7 +604,7 @@ not assign APPLICABLE/NOT APPLICABLE/SATISFIED/VIOLATED.
 
 
 REQUIREMENT_STRUCTURAL_COMPLETION_V086_PROMPT = r"""
-You are the v0.8.7 targeted Requirement IR structural completer.
+You are the v0.8.8 targeted Requirement IR structural completer.
 Return only the requested RequirementStructuralPatchBatch schema.
 
 Python has already identified exact structured fields that are transport-valid but
@@ -630,7 +630,7 @@ Do not calculate applicability, compliance, timing from evidence, hypotheses, or
 
 
 EVIDENCE_ANNOTATION_V086_PROMPT = r"""
-You are the v0.8.7 Evidence Semantic Annotator for an automotive RCA pipeline.
+You are the v0.8.8 Evidence Semantic Annotator for an automotive RCA pipeline.
 Return only the requested EvidenceAnnotationBatch schema.
 
 Annotate only evidence_requiring_language_interpretation. Structured timestamped
@@ -717,46 +717,33 @@ misrepresented. Do not calculate compliance and do not repair the IR.
 
 
 SEMANTIC_ARBITRATION_PROMPT = r"""
-You are the single case-level semantic arbitrator for v0.8.7.
+You are the single case-level semantic arbitrator for v0.8.8.
 Return only the requested SemanticArbitrationResponse schema.
 
-A fast semantic compiler has already run, but Python detected one or more
-MATERIAL semantic integrity problems that block deterministic compliance.
-Resolve ALL supplied arbitration questions in this ONE call.
+Python detected MATERIAL semantic integrity problems after independent semantic
+verification. Resolve all supplied questions in this one call from the exact
+authoritative source fields.
 
-You are given exact authoritative source fields scoped to the listed material issues, plus the issue list. Interpret those original source fields independently. Do not assume the fast
-model's candidate interpretation is correct; candidate semantic objects are not
-provided as authority.
+REQUIREMENT REPAIR CONTRACT
+- Prefer requirement_patches.
+- For each requirement, return ONLY fields explicitly named in
+  requirement_field_targets. Do not repeat or modify unrelated valid fields.
+- Each returned target field must be complete and executable.
+- Ground semantic_id/source_phrase on the authoritative requirement text.
+- every returned PREDICATE must explicitly populate semantic_id, exact grounded source_phrase, signal, executable operator and value; do not return anonymous executable nodes.
+- Triggers require signal/event/value.
+- Timing requires semantic_id, limit_ms, relation and source_phrase.
+- Persistence requires semantic_id, required=true, a concrete scope and source_phrase.
+- If source_clauses is targeted, return the complete verified audit inventory.
+- Legacy complete requirement_irs are permitted for compatibility, but Python
+  will copy only explicitly targeted fields; unrelated fields have no authority.
 
-Return only corrected Requirement IRs and/or evidence annotations for the requested requirement/evidence IDs. A Requirement IR returned by arbitration is
-a COMPLETE REPLACEMENT REPAIR, not another partial candidate:
-- encode every clear state condition into condition AST nodes;
-- every returned PREDICATE must explicitly populate semantic_id, exact grounded source_phrase, signal, operator, and value;
-- every executable condition group that is inventoried in source_clauses must carry the same semantic_id on the corresponding IR node;
-- encode every clear required/prohibited output into required_behavior with semantic_id, exact grounded source_phrase, signal/process description, and executable operator/value when it is a signal-value obligation;
-- encode clear trigger, timing, persistence and relationship semantics in their
-  dedicated fields;
-- mark source_clauses VERIFIED when their meaning is resolved, and ensure every material source_clauses.semantic_id is present on the exact executable IR element representing that clause; do not return anonymous executable nodes alongside separately named source clauses;
-- do not return normative_type=AMBIGUOUS merely because wording is mixed
-  German/English or Boolean logic is nested;
-- never return a Requirement IR that only describes the correct semantics in
-  source_clauses/notes while leaving the executable fields null;
-- do not invent persistence for a plain "shall be X" obligation. Return persistence only when the authoritative source explicitly says remain/while/throughout/non-occurrence.
-
-Evidence annotations returned here are also COMPLETE REPLACEMENT REPAIRS:
-- annotation resolution and every returned fact resolution must be VERIFIED;
-- a fact linked to compliance must materialize its meaning in subject/operator/value/temporal_semantics, not only in notes;
-- operator must be exactly EQ, NEQ, LT, LTE, GT, GTE, PRESENT, ABSENT, or OTHER;
-- do not return temporal_semantics=OTHER for a fact that is claimed to resolve a requirement/evidence compliance issue;
-- persistent-state facts require scope.resolution=RESOLVED AND a concrete
-  non-empty scope.scope_id;
-- if evidence scope or meaning remains ambiguous, do not return a partial
-  annotation merely to make it executable. Preserve the blocking issue ID in
-  unresolved_issue_ids instead.
-
-If a requested source is genuinely ambiguous, DO NOT return a pseudo-repair IR
-or evidence annotation for it. Instead preserve the corresponding blocking IDs
-in unresolved_issue_ids. Never guess merely to make the case executable.
+EVIDENCE REPAIR CONTRACT
+- Evidence annotations are complete replacements for targeted evidence IDs.
+- Returned facts used for compliance must be VERIFIED and executable.
+- Persistent facts require RESOLVED scope and non-empty scope_id.
+- If meaning/scope remains genuinely ambiguous, put its issue ID in
+  unresolved_issue_ids instead of guessing.
 
 Do not calculate compliance, timing verdicts, hypotheses or root causes.
 """.strip()
